@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { clearAuthData } from '../api/client'
@@ -15,7 +15,7 @@ export default function StaffHeader() {
     try {
       clearAuthData()
       logout('manual')
-      nav('/login')
+      nav('/')
     } catch (error) {
       console.error('Logout error:', error)
       showToast({ type:'error', message:'Error al cerrar sesión' })
@@ -37,45 +37,83 @@ export default function StaffHeader() {
   )
 
   return (
-    <header className="header">
-      <div className="container" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <div className="nav" style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <img src="/logo.png" alt="Papas Queen's Logo" className="logo" style={{ height:'48px' }} />
+    <header className="header" style={{ background: '#ffffff', boxShadow: '0 2px 4px rgba(15,23,42,0.08)' }}>
+      <div className="container" style={{ padding: '0.5rem 0' }}>
+        {/* Única fila: logo + navegación + acciones */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'1.5rem' }}>
+          {/* Logo y título pegados a la izquierda */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              border: '2px solid #03592e',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              background: '#fff',
+            }}>
+              <img 
+                src="https://tofuu.getjusto.com/orioneat-prod/ynBWKNhowKKGBQatZ-A4--LOGOTIPO.png" 
+                alt="Papas Queen's Logo" 
+                style={{ width: '38px', height: '38px', objectFit: 'cover' }}
+              />
+            </div>
             <div>
-              <h1 className="appTitle" style={{ fontSize: '20px', margin: 0 }}>Papas Queen's</h1>
-              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Staff Portal</span>
+              <h1
+                className="appTitle"
+                style={{
+                  fontSize: '16px',
+                  margin: 0,
+                  fontWeight: 700,
+                  letterSpacing: '.02em',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Papas Queen's
+              </h1>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Staff Portal</span>
             </div>
           </div>
-        </div>
 
-        {/* Desktop Navigation */}
-        <nav className="nav" style={{ gap:'0.5rem', display: window.innerWidth > 768 ? 'flex' : 'none' }}>
-          {filteredNavItems.map(item => (
-            <button
-              key={item.path}
-              className={`btn ${isActive(item.path) ? 'primary' : 'ghost'}`}
-              onClick={() => {
-                nav(item.path)
-                setMobileMenuOpen(false)
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '14px',
-                padding: '0.5rem 1rem',
-                height: '2.5rem'
-              }}
-            >
-              <span style={{ fontSize: '16px' }}>{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
+          {/* Navegación central */}
+          <nav
+            className="nav"
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              gap: '1rem',
+              fontSize: '12px',
+            }}
+          >
+            {filteredNavItems.map(item => (
+              <button
+                key={item.path}
+                onClick={() => {
+                  nav(item.path)
+                  setMobileMenuOpen(false)
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '0 0 0.25rem',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: isActive(item.path) ? 700 : 500,
+                  letterSpacing: '.04em',
+                  textTransform: 'uppercase',
+                  color: isActive(item.path) ? '#03592e' : '#64748b',
+                  borderBottom: isActive(item.path) ? '2px solid #03592e' : '2px solid transparent',
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
 
-        {/* User Actions */}
-        <div className="nav" style={{ gap:'1rem', alignItems: 'center' }}>
+          {/* User Actions a la derecha */}
+          <div className="nav" style={{ gap:'0.75rem', alignItems: 'center' }}>
           {auth?.token ? (
             <>
               {/* Connection Status Indicator */}
@@ -135,8 +173,9 @@ export default function StaffHeader() {
               </button>
             </>
           ) : (
-            <Link className="btn primary" to="/login">🔐 Staff Login</Link>
+            <Link className="btn primary" to="/">🔐 Staff Login</Link>
           )}
+          </div>
         </div>
       </div>
     </header>

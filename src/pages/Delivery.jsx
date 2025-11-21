@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { api, haversine, formatDuration } from '../api/client'
 import { useToast } from '../context/ToastContext'
+import { useDeliveryData } from '../hooks/useDeliveryData'
 import L from 'leaflet'
 
 const markerIcon = L.icon({
@@ -13,59 +14,21 @@ const markerIcon = L.icon({
 })
 
 export default function Delivery() {
-  const [riders, setRiders] = useState([])
   const [filter, setFilter] = useState('')
-  const [actives, setActives] = useState([])
   const [trackingId, setTrackingId] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [ridersLoading, setRidersLoading] = useState(false)
-  const [activesLoading, setActivesLoading] = useState(false)
   const mapRef = useRef(null)
   const markerRef = useRef(null)
   const polyRef = useRef(null)
   const { showToast } = useToast()
-
-  async function loadRiders() {
-    setRidersLoading(true)
-    try {
-      const data = await api('/riders', { timeout: 15000 })
-      setRiders(Array.isArray(data) ? data : (data.items || []))
-    } catch (e) {
-      console.error('Error loading riders:', e)
-      setRiders([])
-      showToast({ type: 'error', message: 'Error al cargar repartidores' })
-    } finally {
-      setRidersLoading(false)
-    }
-  }
-
-  async function loadActives() {
-    setActivesLoading(true)
-    try {
-      const data = await api('/delivery', { timeout: 15000 })
-      const list = Array.isArray(data) ? data : (data.items || [])
-      setActives(list)
-    } catch (e) {
-      console.error('Error loading active deliveries:', e)
-      setActives([])
-      showToast({ type: 'error', message: 'Error al cargar entregas activas' })
-    } finally {
-      setActivesLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const initializeData = async () => {
-      setLoading(true)
-      await Promise.all([loadRiders(), loadActives()])
-      setLoading(false)
-    }
-    
-    initializeData()
-    const t1 = setInterval(loadRiders, 20000)
-    const t2 = setInterval(loadActives, 20000)
-    return () => { clearInterval(t1); clearInterval(t2) }
-  }, [])
+  const {
+    riders,
+    actives,
+    ridersLoading,
+    activesLoading,
+    loadingAll,
+    reloadRiders,
+    reloadActives,
+  } = useDeliveryData(20000)
 
   async function setStatus(id, status) {
     try {
@@ -74,7 +37,7 @@ export default function Delivery() {
         body: JSON.stringify({ status }),
         timeout: 10000 
       })
-      await loadRiders()
+      await reloadRiders()
       showToast({ type:'success', message: `Estado actualizado a "${status}"` })
     } catch (e) {
       console.error('Error setting rider status:', e)
@@ -111,7 +74,7 @@ export default function Delivery() {
       msg.style.color = '#16a34a'
       showToast({ type:'success', message:'Pedido asignado correctamente' })
       ev.currentTarget.reset()
-      await loadActives()
+      await reloadActives()
     } catch (e) {
       console.error('Error assigning delivery:', e)
       msg.textContent = e.message || 'Error al asignar delivery'
@@ -150,7 +113,7 @@ export default function Delivery() {
       msg.textContent = 'Acción realizada exitosamente'
       msg.style.color = '#16a34a'
       showToast({ type:'success', message:'Acción realizada correctamente' })
-      await loadActives()
+      await reloadActives()
     } catch (e) {
       console.error('Error executing action:', e)
       msg.textContent = e.message || 'Error ejecutando acción'
@@ -272,7 +235,7 @@ export default function Delivery() {
     return () => clearInterval(t)
   }, [trackingId])
 
-  if (loading) {
+  if (loadingAll) {
     return (
       <main className="container section" style={{ textAlign: 'center', padding: '3rem 0' }}>
         <div className="spinner" style={{ 
@@ -378,7 +341,7 @@ export default function Delivery() {
               />
               <button 
                 className="btn" 
-                onClick={loadRiders}
+                onClick={reloadRiders}
                 disabled={ridersLoading}
                 style={{ minWidth: '80px' }}
               >

@@ -1,32 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { api, formatPrice } from '../api/client'
 import { useToast } from '../context/ToastContext'
+import { useKitchenQueue } from '../hooks/useKitchenQueue'
 
 export default function Kitchen() {
-  const [queue, setQueue] = useState([])
-  const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState({})
   const { showToast } = useToast()
-
-  async function load() {
-    try {
-      setLoading(true)
-      const data = await api('/kitchen/queue')
-      setQueue(Array.isArray(data) ? data : (data.items || []))
-    } catch (e) {
-      console.error('Error loading kitchen queue:', e)
-      setQueue([])
-      showToast({ type:'error', message:'Error cargando la cola de pedidos' })
-    } finally { 
-      setLoading(false) 
-    }
-  }
-
-  useEffect(() => { 
-    load()
-    const t = setInterval(load, 15000)
-    return () => clearInterval(t)
-  }, [])
+  const { queue, loading, reload } = useKitchenQueue(15000)
 
   async function doAction(kind, id) {
     const actionKey = `${kind}-${id}`
@@ -41,7 +21,7 @@ export default function Kitchen() {
         await api(`/kitchen/orders/${encodeURIComponent(id)}/pack`, { method: 'POST' })
         showToast({ type:'success', message: '📦 Pedido empacado correctamente' })
       }
-      await load()
+      await reload()
     } catch (e) {
       console.error('Error in kitchen action:', e)
       const msg = (e && e.message) || 'No se pudo ejecutar la acción'
@@ -52,14 +32,16 @@ export default function Kitchen() {
   }
 
   const getStatusBadge = (order) => {
-    const status = order.status || order.estado || 'pending'
+    const rawStatus = order.status || order.estado || 'pending'
+    const status = String(rawStatus).toLowerCase()
     const statusConfig = {
-      'pending': { class: 'warning', text: 'Pendiente', icon: '⏳' },
-      'accepted': { class: 'info', text: 'Aceptado', icon: '👨‍🍳' },
-      'preparing': { class: 'info', text: 'Preparando', icon: '🔥' },
-      'ready': { class: 'success', text: 'Listo', icon: '✅' },
-      'packed': { class: 'success', text: 'Empacado', icon: '📦' },
-      'delivered': { class: 'success', text: 'Entregado', icon: '🚚' }
+      pending:   { class: 'warning', text: 'Pendiente', icon: '⏳' },
+      accepted:  { class: 'info',    text: 'Aceptado',  icon: '👨‍🍳' },
+      preparing: { class: 'info',    text: 'Preparando', icon: '🔥' },
+      ready:     { class: 'success', text: 'Listo',     icon: '✅' },
+      packed:    { class: 'success', text: 'Empacado',  icon: '📦' },
+      delivered: { class: 'success', text: 'Entregado', icon: '🚚' },
+      cancelled: { class: 'danger',  text: 'Cancelado', icon: '❌' },
     }
     
     const config = statusConfig[status] || statusConfig.pending
@@ -84,6 +66,11 @@ export default function Kitchen() {
     return `Hace ${hours}h ${mins}min`
   }
 
+  const visibleQueue = queue.filter(order => {
+    const status = String(order.status || order.estado || '').toLowerCase()
+    return status !== 'cancelled' && status !== 'cancelado'
+  })
+
   return (
     <main className="container section">
       <div style={{ 
@@ -101,7 +88,7 @@ export default function Kitchen() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button className="btn" onClick={load} disabled={loading}>
+          <button className="btn" onClick={reload} disabled={loading}>
             {loading ? (
               <><div className="loading" style={{ width: '16px', height: '16px' }}></div> Actualizando...</>
             ) : (
@@ -111,12 +98,12 @@ export default function Kitchen() {
         </div>
       </div>
 
-      {loading && queue.length === 0 ? (
+      {loading && visibleQueue.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
           <div className="loading" style={{ width: '40px', height: '40px', margin: '0 auto 1rem' }}></div>
           <p style={{ color: '#64748b' }}>Cargando cola de pedidos...</p>
         </div>
-      ) : queue.length === 0 ? (
+      ) : visibleQueue.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
           <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🍽️</div>
           <h3 style={{ color: '#03592E', marginBottom: '0.5rem' }}>No hay pedidos en cola</h3>
@@ -134,12 +121,12 @@ export default function Kitchen() {
             border: '1px solid rgba(3, 89, 46, 0.1)'
           }}>
             <p style={{ margin: 0, color: '#03592E', fontWeight: '500' }}>
-              📊 {queue.length} pedidos en cola
+              📊 {visibleQueue.length} pedidos en cola
             </p>
           </div>
           
           <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
-            {queue.map((order, index) => {
+            {visibleQueue.map((order, index) => {
               const orderId = order.id_order || order.order_id || order.id
               const acceptKey = `accept-${orderId}`
               const packKey = `pack-${orderId}`
@@ -177,8 +164,13 @@ export default function Kitchen() {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div className="price" style={{ fontSize: '1.2rem' }}>
-                          {formatPrice(order.total || 0)}
+                        <div className="price" style={{ fontSize: '1.1rem' }}>
+                          {(() => {
+                            const paymentStatus = String(order.payment_status || order.estado_pago || '').toLowerCase()
+                            const isPaid = paymentStatus === 'paid' || paymentStatus === 'pagado'
+                            if (isPaid) return 'Pagado'
+                            return formatPrice(order.total || 0)
+                          })()}
                         </div>
                         {getStatusBadge(order)}
                       </div>
@@ -186,7 +178,7 @@ export default function Kitchen() {
                     
                     <div>
                       <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '0.5rem' }}>
-                        👤 {order.customer_name || order.customer || 'Cliente no especificado'}
+                        👤 {order.customer_name || order.customer || 'Cliente no registrado'}
                       </div>
                       {order.phone && (
                         <div style={{ fontSize: '14px', color: '#64748b' }}>
@@ -240,7 +232,7 @@ export default function Kitchen() {
                       <button 
                         className="btn success" 
                         onClick={() => doAction('accept', orderId)}
-                        disabled={actionLoading[acceptKey] || order.status === 'accepted'}
+                        disabled={actionLoading[acceptKey] || String(order.status || order.estado).toLowerCase() !== 'pending'}
                         style={{ 
                           flex: 1,
                           opacity: order.status === 'accepted' ? 0.5 : 1,
@@ -256,7 +248,7 @@ export default function Kitchen() {
                       <button 
                         className="btn primary" 
                         onClick={() => doAction('pack', orderId)}
-                        disabled={actionLoading[packKey] || order.status !== 'accepted'}
+                        disabled={actionLoading[packKey] || String(order.status || order.estado).toLowerCase() !== 'accepted'}
                         style={{ 
                           flex: 1,
                           opacity: order.status !== 'accepted' ? 0.5 : 1,

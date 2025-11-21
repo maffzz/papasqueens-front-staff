@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getTenantId, setTenantId } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -8,9 +8,33 @@ export default function Login() {
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [selectedSede, setSelectedSede] = useState(() => {
+    const current = getTenantId()
+    if (current === 'tenant_pq_barranco') return 'barranco'
+    if (current === 'tenant_pq_puruchuco') return 'puruchuco'
+    if (current === 'tenant_pq_villa_maria') return 'villa-maria'
+    if (current === 'tenant_pq_jiron') return 'jiron'
+    return 'barranco'
+  })
   const nav = useNavigate()
   const { login } = useAuth()
   const { showToast } = useToast()
+
+  const SEDE_OPTIONS = [
+    { id: 'barranco', label: 'Sede Barranco (UTEC)', tenant: 'tenant_pq_barranco' },
+    { id: 'puruchuco', label: 'Sede Puruchuco', tenant: 'tenant_pq_puruchuco' },
+    { id: 'villa-maria', label: 'Sede Villa María', tenant: 'tenant_pq_villa_maria' },
+    { id: 'jiron', label: 'Sede Jirón', tenant: 'tenant_pq_jiron' },
+  ]
+
+  useEffect(() => {
+    const current = getTenantId()
+    if (!current) {
+      const defaultTenant = SEDE_OPTIONS.find(s => s.id === selectedSede)?.tenant || 'tenant_pq_barranco'
+      setTenantId(defaultTenant)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function onSubmit(ev) {
     ev.preventDefault()
@@ -105,23 +129,22 @@ export default function Login() {
   return (
     <main style={{ 
       minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 
+      background: '#f8fafc', 
       display: 'flex', 
-      alignItems: 'center', 
+      alignItems: 'flex-start', 
       justifyContent: 'center', 
-      padding: '2rem 1rem'
+      padding: '3rem 1.25rem 2rem'
     }}>
-      <section className="container" style={{ maxWidth: 450, margin: '0 auto' }}>
+      <section className="container" style={{ maxWidth: 520, margin: '0 auto' }}>
         <div className="card" style={{ 
-          padding: '3rem 2.5rem', 
-          boxShadow: 'var(--shadow-xl)', 
+          padding: '2.1rem 2.5rem 1.8rem', 
+          boxShadow: '0 16px 40px rgba(15,23,42,0.16)', 
           borderRadius: '1.5rem', 
-          background: 'rgba(255, 255, 255, 0.98)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
+          background: '#ffffff',
+          border: '1px solid rgba(226, 232, 240, 0.9)'
         }}>
           <div style={{ width: '100%' }}>
-            <header style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <div style={{ 
                 width: '80px', 
                 height: '80px', 
@@ -138,14 +161,53 @@ export default function Login() {
                   <circle cx="12" cy="7" r="4"/>
                 </svg>
               </div>
-              <h1 className="appTitle" style={{ fontSize: '32px', marginBottom: '0.5rem' }}>Papas Queen's</h1>
-              <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#64748b', marginBottom: '0.5rem' }}>Portal Staff</h2>
+              <h1 className="appTitle" style={{ fontSize: '26px', marginBottom: '0.1rem', letterSpacing: '.08em', textTransform: 'uppercase' }}>Papas Queen's</h1>
+              <h2 style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '0.35rem' }}>Portal Staff</h2>
               <p style={{ fontSize: '14px', color: '#64748b', margin: 0, lineHeight: '1.5' }}>
                 Ingresa tus credenciales para acceder al sistema de gestión
               </p>
             </header>
 
-            <form onSubmit={onSubmit} className="list" style={{ gap: '1.5rem' }}>
+            <form
+              onSubmit={onSubmit}
+              className="list"
+              style={{ gap: '1.2rem', maxWidth: '380px', margin: '0 auto' }}
+            >
+              <div style={{
+                marginBottom: '0.75rem',
+                padding: '0.75rem 0.85rem',
+                borderRadius: '0.9rem',
+                background: 'rgba(15,23,42,0.02)',
+                border: '1px solid rgba(148,163,184,0.3)'
+              }}>
+                <p style={{ margin: 0, fontSize: '12px', color: '#0f172a', fontWeight: 600 }}>
+                  Indica de qué sede eres staff
+                </p>
+                <select
+                  className="input"
+                  value={selectedSede}
+                  disabled={loading}
+                  onChange={e => {
+                    const value = e.target.value
+                    setSelectedSede(value)
+                    const opt = SEDE_OPTIONS.find(s => s.id === value)
+                    if (opt) {
+                      setTenantId(opt.tenant)
+                    }
+                  }}
+                  style={{ fontSize: '13px', paddingInline: '0.65rem' }}
+                >
+                  {SEDE_OPTIONS.map(opt => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '0.1rem' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '0.35rem' }}>
+                  Usuario
+                </label>
+              </div>
               <div style={{ position: 'relative' }}>
                 <div style={{ 
                   position: 'absolute', 
@@ -163,33 +225,18 @@ export default function Login() {
                 <input 
                   className="input" 
                   name="username" 
-                  placeholder="Usuario" 
+                  placeholder="Ej: admin_staff" 
                   required 
                   style={{ paddingLeft: '3rem' }}
                   disabled={loading}
                 />
               </div>
               
-              <div style={{ position: 'relative' }}>
-                <div style={{ 
-                  position: 'absolute', 
-                  left: '12px', 
-                  top: '50%', 
-                  transform: 'translateY(-50%)',
-                  color: '#64748b'
-                }}>
-                  🏢
-                </div>
-                <input 
-                  className="input" 
-                  name="tenant" 
-                  placeholder="Tenant (ej: papasqueens)" 
-                  defaultValue={getTenantId() || 'papasqueens'}
-                  style={{ paddingLeft: '3rem' }}
-                  disabled={loading}
-                />
+              <div style={{ marginTop: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '0.35rem' }}>
+                  Contraseña
+                </label>
               </div>
-              
               <div style={{ position: 'relative' }}>
                 <div style={{ 
                   position: 'absolute', 
