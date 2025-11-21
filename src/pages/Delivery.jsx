@@ -45,6 +45,25 @@ export default function Delivery() {
     }
   }
 
+  async function assignFromCard(deliveryId, staffId) {
+    if (!deliveryId || !staffId) {
+      showToast({ type: 'warning', message: 'Ingresa un ID de repartidor válido' })
+      return
+    }
+    try {
+      await api('/delivery/assign', {
+        method: 'POST',
+        body: JSON.stringify({ id_delivery: deliveryId, id_staff: staffId }),
+        timeout: 15000,
+      })
+      showToast({ type: 'success', message: 'Repartidor asignado a la entrega' })
+      await reloadActives()
+    } catch (e) {
+      console.error('Error assigning from card:', e)
+      showToast({ type: 'error', message: e.message || 'No se pudo asignar el delivery' })
+    }
+  }
+
   async function assign(ev) {
     ev.preventDefault()
     const fd = new FormData(ev.currentTarget)
@@ -281,44 +300,80 @@ export default function Delivery() {
               <div className="list">
                 {actives.map(d => {
                   const status = d.status || d.estado || 'unknown'
-                  const statusColor = status === 'delivered' ? '#16a34a' : status === 'onroute' ? '#2563eb' : status === 'pickup' ? '#f59e0b' : '#64748b'
+                  const statusColor =
+                    status === 'delivered'
+                      ? '#16a34a'
+                      : status === 'onroute'
+                      ? '#2563eb'
+                      : status === 'pickup'
+                      ? '#f59e0b'
+                      : status === 'listo_para_entrega'
+                      ? '#22c55e'
+                      : '#64748b'
+                  const canAssignHere = String(status).toLowerCase() === 'listo_para_entrega'
+                  const deliveryKey = d.id_delivery || d.id
                   return (
                     <div className="card" key={d.id_delivery || d.id} style={{ 
                       borderLeft: `4px solid ${statusColor}`,
                       transition: 'all 0.2s ease'
                     }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'.5rem' }}>
-                        <div>
-                          <div><strong>Delivery #{d.id_delivery || d.id}</strong> — Pedido {d.id_order || d.order_id}</div>
-                          <div style={{ 
-                            color: statusColor,
-                            fontWeight: '500',
-                            fontSize: '0.875rem'
-                          }}>
-                            Estado: <span style={{ 
-                              background: `${statusColor}20`,
-                              padding: '2px 8px',
-                              borderRadius: '12px',
-                              textTransform: 'capitalize'
-                            }}>{status}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent:'space-between', alignItems:'center', gap:'.5rem' }}>
+                          <div>
+                            <div><strong>Delivery #{deliveryKey}</strong> — Pedido {d.id_order || d.order_id}</div>
+                            <div style={{ 
+                              color: statusColor,
+                              fontWeight: '500',
+                              fontSize: '0.875rem'
+                            }}>
+                              Estado: <span style={{ 
+                                background: `${statusColor}20`,
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                textTransform: 'capitalize'
+                              }}>{status}</span>
+                            </div>
+                          </div>
+                          <div style={{ display:'flex', gap:'.5rem' }}>
+                            <button 
+                              className="btn primary" 
+                              onClick={async () => { 
+                                setTrackingId(deliveryKey); 
+                                try { 
+                                  const data = await api(`/delivery/${encodeURIComponent(deliveryKey)}/track`); 
+                                  renderTrack(data) 
+                                  showToast({ type: 'success', message: 'Tracking iniciado' })
+                                } catch (e) {
+                                  showToast({ type: 'error', message: 'Error al iniciar tracking' })
+                                }
+                              }}
+                              style={{ fontSize: '0.875rem' }}
+                            >
+                              📍 Track
+                            </button>
                           </div>
                         </div>
-                        <div style={{ display:'flex', gap:'.5rem' }}>
-                          <button 
-                            className="btn primary" 
-                            onClick={async () => { 
-                              setTrackingId(d.id_delivery || d.id); 
-                              try { 
-                                const data = await api(`/delivery/${encodeURIComponent(d.id_delivery || d.id)}/track`); 
-                                renderTrack(data) 
-                                showToast({ type: 'success', message: 'Tracking iniciado' })
-                              } catch (e) {
-                                showToast({ type: 'error', message: 'Error al iniciar tracking' })
-                              }
+
+                        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            id={`assign-staff-${deliveryKey}`}
+                            className="input"
+                            placeholder="ID de repartidor para esta entrega"
+                            style={{ flex: 1, minWidth: 0 }}
+                            disabled={!canAssignHere}
+                          />
+                          <button
+                            className="btn"
+                            type="button"
+                            disabled={!canAssignHere}
+                            onClick={() => {
+                              const input = document.getElementById(`assign-staff-${deliveryKey}`)
+                              const value = input ? input.value.trim() : ''
+                              assignFromCard(deliveryKey, value)
                             }}
-                            style={{ fontSize: '0.875rem' }}
+                            style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}
                           >
-                            📍 Track
+                            Asignar
                           </button>
                         </div>
                       </div>
@@ -365,10 +420,22 @@ export default function Delivery() {
               <div className="list">
                 {riders.filter(r => !filter || String(r.id_staff||r.id||'').includes(filter) || String(r.nombre||r.name||'').toLowerCase().includes(filter.toLowerCase()))
                   .map(r => {
-                    const status = r.status || r.estado || 'unknown'
-                    const isAvailable = status === 'available' || status === 'disponible'
-                    const statusColor = isAvailable ? '#16a34a' : '#dc2626'
-                    const statusText = isAvailable ? 'Disponible' : status === 'busy' || status === 'ocupado' ? 'Ocupado' : status
+                    const status = (r.status || r.estado || 'unknown').toLowerCase()
+                    const riderId = r.id_staff || r.id
+                    const hasActiveDelivery = actives.some(d => {
+                      const dStatus = String(d.status || d.estado || '').toLowerCase()
+                      const notFinished = dStatus !== 'delivered' && dStatus !== 'entregado'
+                      return notFinished && (d.id_staff === riderId)
+                    })
+
+                    const isAvailable = !hasActiveDelivery && (status === 'available' || status === 'disponible')
+                    const isBusy = hasActiveDelivery || status === 'busy' || status === 'ocupado'
+                    const statusColor = isAvailable ? '#a31616' : '#55aa3e'
+                    const statusText = isAvailable
+                      ? 'Disponible'
+                      : isBusy
+                      ? 'Ocupado (con entrega activa)'
+                      : status
                     
                     return (
                       <div className="card" key={r.id_staff || r.id} style={{ 

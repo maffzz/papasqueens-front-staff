@@ -27,7 +27,8 @@ export function useDeliveryData(pollIntervalMs = 20000) {
   const loadActives = useCallback(async () => {
     setActivesLoading(true)
     try {
-      const data = await api('/delivery', { timeout: 15000 })
+      // Solo entregas que están listas para asignar a un repartidor
+      const data = await api('/delivery?status=listo_para_entrega', { timeout: 15000 })
       const list = Array.isArray(data) ? data : (data.items || [])
       setActives(list)
     } catch (e) {

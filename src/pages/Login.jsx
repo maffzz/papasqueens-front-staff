@@ -171,7 +171,13 @@ export default function Login() {
             <form
               onSubmit={onSubmit}
               className="list"
-              style={{ gap: '1.2rem', maxWidth: '380px', margin: '0 auto' }}
+              style={{
+                gap: '1.2rem',
+                width: '100%',
+                maxWidth: '380px',
+                margin: '0 auto',
+                boxSizing: 'border-box',
+              }}
             >
               <div style={{
                 marginBottom: '0.75rem',
@@ -227,7 +233,11 @@ export default function Login() {
                   name="username" 
                   placeholder="Ej: admin_staff" 
                   required 
-                  style={{ paddingLeft: '3rem' }}
+                  style={{
+                    paddingLeft: '3rem',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                  }}
                   disabled={loading}
                 />
               </div>
@@ -257,7 +267,12 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Contraseña" 
                   required 
-                  style={{ paddingLeft: '3rem', paddingRight: '3rem' }}
+                  style={{
+                    paddingLeft: '3rem',
+                    paddingRight: '3rem',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                  }}
                   disabled={loading}
                 />
                 <button
