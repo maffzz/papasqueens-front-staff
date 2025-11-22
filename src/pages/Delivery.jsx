@@ -16,6 +16,9 @@ const markerIcon = L.icon({
 export default function Delivery() {
   const [filter, setFilter] = useState('')
   const [trackingId, setTrackingId] = useState('')
+  const [selectedOrderId, setSelectedOrderId] = useState('')
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState('')
+  const [selectedRiderId, setSelectedRiderId] = useState('')
   const mapRef = useRef(null)
   const markerRef = useRef(null)
   const polyRef = useRef(null)
@@ -65,22 +68,28 @@ export default function Delivery() {
   }
 
   async function assign(ev) {
-    ev.preventDefault()
-    const fd = new FormData(ev.currentTarget)
+    // Manejar invocaciones tanto desde onSubmit real como desde llamadas manuales
+    ev?.preventDefault?.()
+    const formEl = ev?.currentTarget || document.getElementById('assign-form')
+    if (!formEl) return
+
+    const fd = new FormData(formEl)
     const payload = { id_order: fd.get('order'), id_staff: fd.get('rider') }
     const msg = document.getElementById('assign-msg')
-    const submitBtn = ev.currentTarget.querySelector('button[type="submit"]')
-    const originalText = submitBtn.textContent
+    const submitBtn = formEl.querySelector('button[type="submit"]')
+    const originalText = submitBtn ? submitBtn.textContent : 'Asignar'
     
     if (!payload.id_order || !payload.id_staff) {
-      msg.textContent = 'IDs requeridos'
+      msg.textContent = 'Selecciona un pedido y un repartidor'
       msg.style.color = '#dc2626'
-      showToast({ type:'warning', message:'Completa ID de pedido y staff' })
+      showToast({ type:'warning', message:'Selecciona un pedido y un repartidor en las listas' })
       return
     }
     
-    submitBtn.disabled = true
-    submitBtn.textContent = 'Asignando...'
+    if (submitBtn) {
+      submitBtn.disabled = true
+      submitBtn.textContent = 'Asignando...'
+    }
     msg.textContent = ''
     
     try {
@@ -92,7 +101,10 @@ export default function Delivery() {
       msg.textContent = `Asignado (delivery: ${res.id_delivery || res.delivery_id || res.id || '—'})`
       msg.style.color = '#16a34a'
       showToast({ type:'success', message:'Pedido asignado correctamente' })
-      ev.currentTarget.reset()
+      formEl.reset()
+      setSelectedOrderId('')
+      setSelectedDeliveryId('')
+      setSelectedRiderId('')
       await reloadActives()
     } catch (e) {
       console.error('Error assigning delivery:', e)
@@ -100,8 +112,10 @@ export default function Delivery() {
       msg.style.color = '#dc2626'
       showToast({ type:'error', message: e.message || 'Error al asignar pedido' })
     } finally {
-      submitBtn.disabled = false
-      submitBtn.textContent = originalText
+      if (submitBtn) {
+        submitBtn.disabled = false
+        submitBtn.textContent = originalText
+      }
     }
   }
 
@@ -312,15 +326,46 @@ export default function Delivery() {
                       : '#64748b'
                   const canAssignHere = String(status).toLowerCase() === 'listo_para_entrega'
                   const deliveryKey = d.id_delivery || d.id
+                  const isSelected = selectedDeliveryId === deliveryKey
+                  const customerName = d.customer_name || d.nombre_cliente || ''
+                  const deliveryAddress = d.direccion || d.delivery_address || ''
+                  const destLat = typeof d.dest_lat === 'number' ? d.dest_lat : (typeof d.destLat === 'number' ? d.destLat : null)
+                  const destLng = typeof d.dest_lng === 'number' ? d.dest_lng : (typeof d.destLng === 'number' ? d.destLng : null)
                   return (
                     <div className="card" key={d.id_delivery || d.id} style={{ 
                       borderLeft: `4px solid ${statusColor}`,
-                      transition: 'all 0.2s ease'
-                    }}>
+                      transition: 'all 0.2s ease',
+                      boxShadow: isSelected ? '0 0 0 2px #22c55e40' : undefined,
+                      cursor: 'pointer',
+                      background: isSelected ? '#ecfdf5' : 'white'
+                    }}
+                      onClick={() => {
+                        setSelectedOrderId(d.id_order || d.order_id || '')
+                        setSelectedDeliveryId(deliveryKey)
+                        if (destLat != null && destLng != null) {
+                          const latInput = document.getElementById('eta-dest-lat')
+                          const lngInput = document.getElementById('eta-dest-lng')
+                          if (latInput && lngInput) {
+                            latInput.value = String(destLat)
+                            lngInput.value = String(destLng)
+                          }
+                        }
+                      }}
+                    >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                         <div style={{ display: 'flex', justifyContent:'space-between', alignItems:'center', gap:'.5rem' }}>
                           <div>
                             <div><strong>Delivery #{deliveryKey}</strong> — Pedido {d.id_order || d.order_id}</div>
+                            {customerName && (
+                              <div style={{ fontSize: '0.85rem', color: '#0f172a' }}>
+                                Cliente: {customerName}
+                              </div>
+                            )}
+                            {deliveryAddress && (
+                              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                                Dirección: {deliveryAddress}
+                              </div>
+                            )}
                             <div style={{ 
                               color: statusColor,
                               fontWeight: '500',
@@ -354,28 +399,11 @@ export default function Delivery() {
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <input
-                            id={`assign-staff-${deliveryKey}`}
-                            className="input"
-                            placeholder="ID de repartidor para esta entrega"
-                            style={{ flex: 1, minWidth: 0 }}
-                            disabled={!canAssignHere}
-                          />
-                          <button
-                            className="btn"
-                            type="button"
-                            disabled={!canAssignHere}
-                            onClick={() => {
-                              const input = document.getElementById(`assign-staff-${deliveryKey}`)
-                              const value = input ? input.value.trim() : ''
-                              assignFromCard(deliveryKey, value)
-                            }}
-                            style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}
-                          >
-                            Asignar
-                          </button>
-                        </div>
+                        {canAssignHere && (
+                          <div style={{ marginTop: '.25rem', fontSize: '0.8rem', color: '#64748b' }}>
+                            Haz clic en esta tarjeta para seleccionar el pedido.
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -432,12 +460,21 @@ export default function Delivery() {
                     const isBusy = hasActiveDelivery
                     const statusColor = isAvailable ? '#16a34a' : '#dc2626'
                     const statusText = isAvailable ? 'Disponible' : 'Ocupado'
+                    const isSelected = selectedRiderId === riderId
 
                     return (
                       <div className="card" key={r.id_staff || r.id} style={{ 
                         borderLeft: `4px solid ${statusColor}`,
-                        transition: 'all 0.2s ease'
-                      }}>
+                        transition: 'all 0.2s ease',
+                        boxShadow: isSelected ? '0 0 0 2px #22c55e40' : undefined,
+                        cursor: 'pointer',
+                        background: isSelected ? '#eff6ff' : 'white'
+                      }}
+                        onClick={() => {
+                          if (!isAvailable) return
+                          setSelectedRiderId(riderId)
+                        }}
+                      >
                         <div style={{ display:'flex', justifyContent:'space-between', gap:'.5rem', alignItems:'center' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -475,7 +512,7 @@ export default function Delivery() {
                             background: statusColor,
                             color: '#fff'
                           }}>
-                            {isAvailable ? 'Disponible' : 'Ocupado'}
+                            {isAvailable ? (isSelected ? 'Seleccionado' : 'Disponible') : 'Ocupado'}
                           </div>
                         </div>
                       </div>
@@ -490,85 +527,175 @@ export default function Delivery() {
             )}
           </div>
 
+        </div>
+
+        <aside className="list">
           <div className="card">
             <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Asignar Delivery a Pedido</h2>
-            <form onSubmit={assign} className="list">
-              <input className="input" name="order" placeholder="ID de pedido" required />
-              <input className="input" name="rider" placeholder="ID de staff" required />
-              <button className="btn primary" type="submit">Asignar</button>
+            <form 
+              id="assign-form"
+              onSubmit={assign} 
+              className="list"
+              style={{ maxWidth: '420px', margin: '0 auto', width: '100%' }}
+            >
+              <input 
+                className="input" 
+                name="order" 
+                placeholder="ID de pedido" 
+                value={selectedOrderId}
+                readOnly
+              />
+              <input 
+                className="input" 
+                name="rider" 
+                placeholder="ID de staff" 
+                value={selectedRiderId}
+                readOnly
+              />
+              <button 
+                className="btn primary" 
+                type="submit"
+                disabled={!selectedOrderId || !selectedRiderId}
+              >
+                Asignar
+              </button>
             </form>
             <div id="assign-msg" style={{ marginTop: '.5rem' }}></div>
           </div>
 
           <div className="card">
-            <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Acciones del Delivery</h2>
-            <form id="actions-form" className="list" onSubmit={e => e.preventDefault()}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.5rem' }}>
-                <input className="input" name="delivery" placeholder="ID de delivery (para cambiar status)" required />
-                <input className="input" name="order" placeholder="ID de pedido (para handoff/entregado)" required />
-              </div>
-              <div style={{ display:'flex', gap:'.5rem', flexWrap:'wrap' }}>
-                <button className="btn" type="button" onClick={(e) => action('status-pickup', e.currentTarget.closest('form').querySelector('[name=delivery]').value)}>En camino a recoger</button>
-                <button className="btn" type="button" onClick={(e) => action('handoff', e.currentTarget.closest('form').querySelector('[name=order]').value)}>Handoff</button>
-                <button className="btn" type="button" onClick={(e) => action('status-onroute', e.currentTarget.closest('form').querySelector('[name=delivery]').value)}>En ruta</button>
-                <button className="btn" type="button" onClick={(e) => action('delivered', e.currentTarget.closest('form').querySelector('[name=order]').value)}>Entregado</button>
-              </div>
-            </form>
-            <div id="actions-msg" style={{ marginTop: '.5rem' }}></div>
-          </div>
-
-          <div className="card">
-            <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Actualizar ubicación</h2>
-            <form id="loc-form" className="list" onSubmit={sendLocation}>
-              <input className="input" name="delivery" placeholder="ID de delivery" required />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.5rem' }}>
-                <input className="input" name="lat" placeholder="Latitud" required />
-                <input className="input" name="lng" placeholder="Longitud" required />
-              </div>
-              <div style={{ display:'flex', gap:'.5rem' }}>
-                <button className="btn" type="submit">Enviar ubicación</button>
-                <button className="btn" type="button" onClick={useGPS}>Usar GPS del navegador</button>
-              </div>
-            </form>
-            <div id="loc-msg" style={{ marginTop: '.5rem' }}></div>
-          </div>
-        </div>
-
-        <aside className="list">
-          <div className="card">
-            <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Consultar Delivery</h2>
-            <form onSubmit={queryDelivery} className="list">
-              <input className="input" name="delivery" placeholder="ID de delivery" required />
-              <button className="btn" type="submit">Consultar</button>
-            </form>
-            <div id="delivery-view" className="list" style={{ marginTop: '.75rem' }}></div>
-          </div>
-
-          <div className="card">
             <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Track en tiempo real</h2>
-            <form onSubmit={track} className="list">
+            <form 
+              onSubmit={track} 
+              className="list"
+              style={{ maxWidth: '420px', margin: '0 auto', width: '100%' }}
+            >
               <input className="input" name="delivery" placeholder="ID de delivery" required />
               <button className="btn" type="submit">Track</button>
             </form>
             <div id="track-view" className="list" style={{ marginTop: '.75rem' }}></div>
             <div id="map" className="map"></div>
           </div>
+        </aside>
+      </section>
 
-          <div className="card">
-            <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>ETA (estimado de llegada)</h2>
-            <div className="list">
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.5rem' }}>
+      {/* Herramientas avanzadas */}
+      <section className="list" style={{ marginTop: '2.5rem' }}>
+        <h1
+          className="appTitle"
+          style={{
+            marginBottom: '1rem',
+            color: '#0f172a',
+            fontSize: '1.6rem',
+            letterSpacing: '.08em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Herramientas avanzadas
+        </h1>
+        <div
+          className="grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '1.5rem',
+            alignItems: 'stretch',
+          }}
+        >
+          <div className="card" style={{ paddingBottom: '1.5rem' }}>
+            <h3 className="appTitle" style={{ marginBottom: '.75rem', fontSize: '1rem' }}>Actualizar ubicación manual</h3>
+            <form
+              id="loc-form"
+              className="list"
+              onSubmit={sendLocation}
+              style={{ width: '100%', maxWidth: '460px', margin: '0 auto', gap: '.75rem', boxSizing: 'border-box' }}
+            >
+              <input 
+                className="input" 
+                name="delivery" 
+                placeholder="ID de delivery" 
+                value={selectedDeliveryId}
+                onChange={e => setSelectedDeliveryId(e.target.value)}
+                required 
+              />
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                  gap: '.75rem',
+                  alignItems: 'center',
+                }}
+              >
+                <input className="input" name="lat" placeholder="Latitud" required />
+                <input className="input" name="lng" placeholder="Longitud" required />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '.5rem',
+                  justifyContent: 'center',
+                }}
+              >
+                <button className="btn" type="submit" style={{ minWidth: '140px' }}>
+                  Enviar ubicación
+                </button>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={useGPS}
+                  style={{ minWidth: '160px' }}
+                >
+                  Usar GPS del navegador
+                </button>
+              </div>
+            </form>
+            <div id="loc-msg" style={{ marginTop: '.5rem' }}></div>
+          </div>
+
+          <div className="card" style={{ paddingBottom: '1.5rem' }}>
+            <h3 className="appTitle" style={{ marginBottom: '.75rem', fontSize: '1rem' }}>ETA (estimado de llegada)</h3>
+            <div className="list" style={{ width: '100%', maxWidth: '460px', margin: '0 auto', gap: '.75rem', boxSizing: 'border-box' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                  gap: '.75rem',
+                  alignItems: 'center',
+                }}
+              >
                 <input id="eta-dest-lat" className="input" placeholder="Destino lat" />
                 <input id="eta-dest-lng" className="input" placeholder="Destino lng" />
               </div>
-              <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
-                <input id="eta-speed" className="input" defaultValue="25" placeholder="Velocidad km/h (default 25)" />
-                <button className="btn" onClick={(e)=>{ e.preventDefault(); if (trackingId) track(new Event('submit', { cancelable: true })); }}>Recalcular</button>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: '.75rem',
+                  alignItems: 'center',
+                }}
+              >
+                <input
+                  id="eta-speed"
+                  className="input"
+                  defaultValue="25"
+                  placeholder="Velocidad km/h (default 25)"
+                />
+                <button
+                  className="btn"
+                  style={{ whiteSpace: 'nowrap' }}
+                  onClick={e => {
+                    e.preventDefault()
+                    if (trackingId) track(new Event('submit', { cancelable: true }))
+                  }}
+                >
+                  Recalcular
+                </button>
               </div>
               <div id="eta-view" style={{ color:'#666' }}>ETA ~ —</div>
             </div>
           </div>
-        </aside>
+        </div>
       </section>
     </main>
   )

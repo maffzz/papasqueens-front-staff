@@ -78,14 +78,6 @@ export default function AdminAnalytics() {
           </div>
         )}
       </div>
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <h3 className="appTitle" style={{ marginBottom: '.5rem' }}>Actualizar estado de orden</h3>
-        <form onSubmit={patchOrderStatus} className="list">
-          <input className="input" value={orderId} onChange={e=>setOrderId(e.target.value)} placeholder="ID de orden" />
-          <input className="input" value={newStatus} onChange={e=>setNewStatus(e.target.value)} placeholder="Nuevo estado" />
-          <button className="btn primary" type="submit">Actualizar</button>
-        </form>
-      </div>
     </main>
   )
 }
