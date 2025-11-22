@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { api, haversine, formatDuration } from '../api/client'
+import { api, getTenantId } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { useDeliveryData } from '../hooks/useDeliveryData'
 import L from 'leaflet'
@@ -13,6 +13,13 @@ const markerIcon = L.icon({
   shadowSize: [41, 41]
 })
 
+const TENANT_ORIGINS = {
+  tenant_pq_barranco: { lat: -12.1372, lng: -77.0220 }, // Barranco (UTEC)
+  tenant_pq_puruchuco: { lat: -12.0325, lng: -76.9302 },
+  tenant_pq_vmt: { lat: -12.1630, lng: -76.9635 },
+  tenant_pq_jiron: { lat: -12.0560, lng: -77.0370 },
+}
+
 export default function Delivery() {
   const [filter, setFilter] = useState('')
   const [trackingId, setTrackingId] = useState('')
@@ -22,6 +29,8 @@ export default function Delivery() {
   const mapRef = useRef(null)
   const markerRef = useRef(null)
   const polyRef = useRef(null)
+  const routeRef = useRef(null)
+  const destRef = useRef(null) // destino del cliente para trazar ruta origen-destino
   const { showToast } = useToast()
   const {
     riders,
@@ -238,6 +247,8 @@ export default function Delivery() {
     }
     const map = mapRef.current
     const latlngs = points.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number').map(p => [p.lat, p.lng])
+
+    // Limpia línea de track anterior
     if (polyRef.current) { map.removeLayer(polyRef.current); polyRef.current = null }
     if (latlngs.length) {
       polyRef.current = L.polyline(latlngs, { color: '#03592e' }).addTo(map)
@@ -248,15 +259,23 @@ export default function Delivery() {
       markerRef.current = L.marker([last.lat, last.lng], { icon: markerIcon }).addTo(map)
     }
 
-    const destLat = parseFloat(document.getElementById('eta-dest-lat')?.value)
-    const destLng = parseFloat(document.getElementById('eta-dest-lng')?.value)
-    const kmh = parseFloat(document.getElementById('eta-speed')?.value) || 25
-    if (isFinite(destLat) && isFinite(destLng) && last) {
-      const meters = haversine({ lat: last.lat, lng: last.lng }, { lat: destLat, lng: destLng })
-      const mps = Math.max(kmh, 1) * 1000 / 3600
-      const seconds = meters / mps
-      const el = document.getElementById('eta-view')
-      if (el) el.textContent = `ETA ~ ${formatDuration(seconds)} (distancia ${(meters/1000).toFixed(2)} km)`
+    // Dibuja línea entre local (origen) y dirección del cliente (destino)
+    const tenantId = getTenantId()
+    const origin = TENANT_ORIGINS[tenantId]
+    const dest = destRef.current
+    if (origin && dest && typeof dest.lat === 'number' && typeof dest.lng === 'number') {
+      const routeLatLngs = [
+        [origin.lat, origin.lng],
+        [dest.lat, dest.lng],
+      ]
+      if (routeRef.current) { map.removeLayer(routeRef.current); routeRef.current = null }
+      routeRef.current = L.polyline(routeLatLngs, { color: '#0ea5e9', dashArray: '6 4' }).addTo(map)
+      if (!latlngs.length) {
+        map.fitBounds(routeRef.current.getBounds(), { padding: [20, 20] })
+      }
+    } else if (routeRef.current) {
+      map.removeLayer(routeRef.current)
+      routeRef.current = null
     }
   }
 
@@ -329,8 +348,10 @@ export default function Delivery() {
                   const isSelected = selectedDeliveryId === deliveryKey
                   const customerName = d.customer_name || d.nombre_cliente || ''
                   const deliveryAddress = d.direccion || d.delivery_address || ''
-                  const destLat = typeof d.dest_lat === 'number' ? d.dest_lat : (typeof d.destLat === 'number' ? d.destLat : null)
-                  const destLng = typeof d.dest_lng === 'number' ? d.dest_lng : (typeof d.destLng === 'number' ? d.destLng : null)
+                  const rawDestLat = d.dest_lat ?? d.destLat
+                  const rawDestLng = d.dest_lng ?? d.destLng
+                  const destLat = rawDestLat != null ? parseFloat(rawDestLat) : null
+                  const destLng = rawDestLng != null ? parseFloat(rawDestLng) : null
                   return (
                     <div className="card" key={d.id_delivery || d.id} style={{ 
                       borderLeft: `4px solid ${statusColor}`,
@@ -340,15 +361,25 @@ export default function Delivery() {
                       background: isSelected ? '#ecfdf5' : 'white'
                     }}
                       onClick={() => {
-                        setSelectedOrderId(d.id_order || d.order_id || '')
+                        // Siempre seleccionar el delivery a nivel visual / herramientas avanzadas
                         setSelectedDeliveryId(deliveryKey)
-                        if (destLat != null && destLng != null) {
-                          const latInput = document.getElementById('eta-dest-lat')
-                          const lngInput = document.getElementById('eta-dest-lng')
-                          if (latInput && lngInput) {
-                            latInput.value = String(destLat)
-                            lngInput.value = String(destLng)
+
+                        const orderIdForAssign = d.id_order || d.order_id || ''
+                        if (canAssignHere) {
+                          // Solo rellenar el formulario de asignación si la entrega está lista para asignar
+                          setSelectedOrderId(orderIdForAssign)
+                        } else {
+                          // Si ya está asignada / en camino, usar el click para preparar el track en tiempo real
+                          const trackForm = document.getElementById('track-form')
+                          if (trackForm) {
+                            const input = trackForm.querySelector('input[name="delivery"]')
+                            if (input) input.value = String(deliveryKey)
                           }
+                        }
+                        if (isFinite(destLat) && isFinite(destLng)) {
+                          destRef.current = { lat: destLat, lng: destLng }
+                        } else {
+                          destRef.current = null
                         }
                       }}
                     >
@@ -396,6 +427,32 @@ export default function Delivery() {
                             >
                               📍 Track
                             </button>
+                            {['en_camino', 'onroute', 'asignado', 'assigned'].includes(String(status).toLowerCase()) && (d.id_order || d.order_id) && (
+                              <button
+                                className="btn"
+                                style={{ fontSize: '0.875rem' }}
+                                onClick={async e => {
+                                  e.stopPropagation()
+                                  const oid = d.id_order || d.order_id
+                                  try {
+                                    // 1) Confirmar entrega a nivel de delivery + generar recibo y Order.Delivered
+                                    await api(`/delivery/orders/${encodeURIComponent(oid)}/delivered`, {
+                                      method: 'POST',
+                                      body: JSON.stringify({}),
+                                    })
+                                    // 2) Confirmar entrega a nivel de orden (flag de staff para Step Functions)
+                                    await api(`/orders/${encodeURIComponent(oid)}/staff-confirm-delivered`, { method: 'POST' })
+                                    showToast({ type: 'success', message: 'Entrega marcada como entregada' })
+                                    await reloadActives()
+                                  } catch (err) {
+                                    console.error('Error marcando entrega como entregada:', err)
+                                    showToast({ type: 'error', message: err.message || 'No se pudo marcar la entrega como entregada' })
+                                  }
+                                }}
+                              >
+                                ✅ Marcar entregado
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -566,6 +623,7 @@ export default function Delivery() {
           <div className="card">
             <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Track en tiempo real</h2>
             <form 
+              id="track-form"
               onSubmit={track} 
               className="list"
               style={{ maxWidth: '420px', margin: '0 auto', width: '100%' }}
@@ -577,125 +635,6 @@ export default function Delivery() {
             <div id="map" className="map"></div>
           </div>
         </aside>
-      </section>
-
-      {/* Herramientas avanzadas */}
-      <section className="list" style={{ marginTop: '2.5rem' }}>
-        <h1
-          className="appTitle"
-          style={{
-            marginBottom: '1rem',
-            color: '#0f172a',
-            fontSize: '1.6rem',
-            letterSpacing: '.08em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Herramientas avanzadas
-        </h1>
-        <div
-          className="grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '1.5rem',
-            alignItems: 'stretch',
-          }}
-        >
-          <div className="card" style={{ paddingBottom: '1.5rem' }}>
-            <h3 className="appTitle" style={{ marginBottom: '.75rem', fontSize: '1rem' }}>Actualizar ubicación manual</h3>
-            <form
-              id="loc-form"
-              className="list"
-              onSubmit={sendLocation}
-              style={{ width: '100%', maxWidth: '460px', margin: '0 auto', gap: '.75rem', boxSizing: 'border-box' }}
-            >
-              <input 
-                className="input" 
-                name="delivery" 
-                placeholder="ID de delivery" 
-                value={selectedDeliveryId}
-                onChange={e => setSelectedDeliveryId(e.target.value)}
-                required 
-              />
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-                  gap: '.75rem',
-                  alignItems: 'center',
-                }}
-              >
-                <input className="input" name="lat" placeholder="Latitud" required />
-                <input className="input" name="lng" placeholder="Longitud" required />
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '.5rem',
-                  justifyContent: 'center',
-                }}
-              >
-                <button className="btn" type="submit" style={{ minWidth: '140px' }}>
-                  Enviar ubicación
-                </button>
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={useGPS}
-                  style={{ minWidth: '160px' }}
-                >
-                  Usar GPS del navegador
-                </button>
-              </div>
-            </form>
-            <div id="loc-msg" style={{ marginTop: '.5rem' }}></div>
-          </div>
-
-          <div className="card" style={{ paddingBottom: '1.5rem' }}>
-            <h3 className="appTitle" style={{ marginBottom: '.75rem', fontSize: '1rem' }}>ETA (estimado de llegada)</h3>
-            <div className="list" style={{ width: '100%', maxWidth: '460px', margin: '0 auto', gap: '.75rem', boxSizing: 'border-box' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-                  gap: '.75rem',
-                  alignItems: 'center',
-                }}
-              >
-                <input id="eta-dest-lat" className="input" placeholder="Destino lat" />
-                <input id="eta-dest-lng" className="input" placeholder="Destino lng" />
-              </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
-                  gap: '.75rem',
-                  alignItems: 'center',
-                }}
-              >
-                <input
-                  id="eta-speed"
-                  className="input"
-                  defaultValue="25"
-                  placeholder="Velocidad km/h (default 25)"
-                />
-                <button
-                  className="btn"
-                  style={{ whiteSpace: 'nowrap' }}
-                  onClick={e => {
-                    e.preventDefault()
-                    if (trackingId) track(new Event('submit', { cancelable: true }))
-                  }}
-                >
-                  Recalcular
-                </button>
-              </div>
-              <div id="eta-view" style={{ color:'#666' }}>ETA ~ —</div>
-            </div>
-          </div>
-        </div>
       </section>
     </main>
   )
