@@ -428,15 +428,11 @@ export default function Delivery() {
                       return notFinished && (d.id_staff === riderId)
                     })
 
-                    const isAvailable = !hasActiveDelivery && (status === 'available' || status === 'disponible')
-                    const isBusy = hasActiveDelivery || status === 'busy' || status === 'ocupado'
-                    const statusColor = isAvailable ? '#a31616' : '#55aa3e'
-                    const statusText = isAvailable
-                      ? 'Disponible'
-                      : isBusy
-                      ? 'Ocupado (con entrega activa)'
-                      : status
-                    
+                    const isAvailable = !hasActiveDelivery
+                    const isBusy = hasActiveDelivery
+                    const statusColor = isAvailable ? '#16a34a' : '#dc2626'
+                    const statusText = isAvailable ? 'Disponible' : 'Ocupado'
+
                     return (
                       <div className="card" key={r.id_staff || r.id} style={{ 
                         borderLeft: `4px solid ${statusColor}`,
@@ -469,23 +465,17 @@ export default function Delivery() {
                               }}>{statusText}</span>
                             </div>
                           </div>
-                          <div style={{ display:'flex', gap:'.5rem' }}>
-                            <button 
-                              className={`btn ${isAvailable ? 'ghost' : 'primary'}`}
-                              onClick={() => setStatus(r.id_staff || r.id, 'available')}
-                              disabled={ridersLoading}
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                            >
-                              ✅ Disponible
-                            </button>
-                            <button 
-                              className={`btn ${isAvailable ? 'primary' : 'ghost'}`}
-                              onClick={() => setStatus(r.id_staff || r.id, 'busy')}
-                              disabled={ridersLoading}
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                            >
-                              🛑 Ocupado
-                            </button>
+                          <div style={{ 
+                            minWidth: '110px',
+                            textAlign: 'center',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            padding: '0.35rem 0.75rem',
+                            borderRadius: '999px',
+                            background: statusColor,
+                            color: '#fff'
+                          }}>
+                            {isAvailable ? 'Disponible' : 'Ocupado'}
                           </div>
                         </div>
                       </div>

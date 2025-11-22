@@ -27,10 +27,14 @@ export function useDeliveryData(pollIntervalMs = 20000) {
   const loadActives = useCallback(async () => {
     setActivesLoading(true)
     try {
-      // Solo entregas que están listas para asignar a un repartidor
-      const data = await api('/delivery?status=listo_para_entrega', { timeout: 15000 })
+      // Cargar todas las entregas del tenant y filtrar en frontend las que no han terminado
+      const data = await api('/delivery', { timeout: 15000 })
       const list = Array.isArray(data) ? data : (data.items || [])
-      setActives(list)
+      const notFinished = list.filter(d => {
+        const s = String(d.status || d.estado || '').toLowerCase()
+        return s && s !== 'delivered' && s !== 'entregado'
+      })
+      setActives(notFinished)
     } catch (e) {
       console.error('Error loading active deliveries:', e)
       setActives([])
