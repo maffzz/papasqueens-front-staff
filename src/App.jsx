@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import StaffHeader from './components/StaffHeader'
 import { AuthProvider, RequireRole, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
@@ -65,7 +65,7 @@ class ErrorBoundary extends Component {
 }
 
 function AppContent() {
-  const { loading } = useAuth()
+  const { loading, auth } = useAuth()
   
   if (loading) {
     return (
@@ -84,11 +84,18 @@ function AppContent() {
     )
   }
   
+  // Si no hay usuario autenticado (sin token), mostramos solo la pantalla de Login
+  if (!auth || !auth.token) {
+    return <Login />
+  }
+
+  // Si hay usuario autenticado, mostramos el layout completo con Dashboard como raíz
   return (
     <>
       <StaffHeader />
       <Routes>
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<RequireRole roles={["staff","delivery","admin"]}><Dashboard /></RequireRole>} />
         <Route path="/kitchen" element={<RequireRole roles={["staff","admin"]}><Kitchen /></RequireRole>} />
         <Route path="/delivery" element={<RequireRole roles={["staff","delivery","admin"]}><Delivery /></RequireRole>} />

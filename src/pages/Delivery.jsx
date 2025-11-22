@@ -239,7 +239,6 @@ export default function Delivery() {
     if (!t) { wrap.innerHTML = '<div class="card">Sin datos</div>'; return }
     const points = Array.isArray(t) ? t : (t.points || [])
     const last = points[points.length - 1]
-    wrap.innerHTML = `<div class="card"><div><strong>Puntos</strong> (${points.length})</div><div class="list">${points.map(p => `<div>${new Date(p.timestamp || Date.now()).toLocaleTimeString()} — ${p.lat}, ${p.lng}</div>`).join('')}</div><div style=\"margin-top:.5rem; color:#666\">Último: ${last ? (last.lat + ', ' + last.lng) : '—'}</div></div>`
 
     if (!mapRef.current) {
       mapRef.current = L.map('map').setView(last ? [last.lat, last.lng] : [-12.0464, -77.0428], 13)
@@ -410,27 +409,11 @@ export default function Delivery() {
                               }}>{status}</span>
                             </div>
                           </div>
-                          <div style={{ display:'flex', gap:'.5rem' }}>
-                            <button 
-                              className="btn primary" 
-                              onClick={async () => { 
-                                setTrackingId(deliveryKey); 
-                                try { 
-                                  const data = await api(`/delivery/${encodeURIComponent(deliveryKey)}/track`); 
-                                  renderTrack(data) 
-                                  showToast({ type: 'success', message: 'Tracking iniciado' })
-                                } catch (e) {
-                                  showToast({ type: 'error', message: 'Error al iniciar tracking' })
-                                }
-                              }}
-                              style={{ fontSize: '0.875rem' }}
-                            >
-                              📍 Track
-                            </button>
+                          <div style={{ display:'flex', gap:'.6rem' }}>
                             {['en_camino', 'onroute', 'asignado', 'assigned'].includes(String(status).toLowerCase()) && (d.id_order || d.order_id) && (
                               <button
                                 className="btn"
-                                style={{ fontSize: '0.875rem' }}
+                                style={{ fontSize: '0.875rem', padding: '0.55rem 1.1rem', minHeight: '2.4rem', minWidth: '9rem', whiteSpace: 'nowrap' }}
                                 onClick={async e => {
                                   e.stopPropagation()
                                   const oid = d.id_order || d.order_id
