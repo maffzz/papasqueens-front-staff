@@ -417,7 +417,15 @@ export default function Delivery() {
                                 onClick={async e => {
                                   e.stopPropagation()
                                   const oid = d.id_order || d.order_id
+                                  const did = d.id_delivery || d.id
                                   try {
+                                    // 0) Actualizar el estado del delivery a 'entregado' para liberar al repartidor
+                                    if (did) {
+                                      await api(`/delivery/${encodeURIComponent(did)}/status`, {
+                                        method: 'PATCH',
+                                        body: JSON.stringify({ status: 'entregado' }),
+                                      })
+                                    }
                                     // 1) Confirmar entrega a nivel de delivery + generar recibo y Order.Delivered
                                     await api(`/delivery/orders/${encodeURIComponent(oid)}/delivered`, {
                                       method: 'POST',
