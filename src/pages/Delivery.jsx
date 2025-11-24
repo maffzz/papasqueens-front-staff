@@ -26,11 +26,16 @@ export default function Delivery() {
   const [selectedOrderId, setSelectedOrderId] = useState('')
   const [selectedDeliveryId, setSelectedDeliveryId] = useState('')
   const [selectedRiderId, setSelectedRiderId] = useState('')
+  const [autoGPS, setAutoGPS] = useState(false)
+  const [gpsWatchId, setGpsWatchId] = useState(null)
+  const [simulatingRoute, setSimulatingRoute] = useState(false)
+  const [simulationProgress, setSimulationProgress] = useState(0)
   const mapRef = useRef(null)
   const markerRef = useRef(null)
   const polyRef = useRef(null)
   const routeRef = useRef(null)
   const destRef = useRef(null) // destino del cliente para trazar ruta origen-destino
+  const simulationIntervalRef = useRef(null)
   const { showToast } = useToast()
   const {
     riders,
@@ -208,11 +213,256 @@ export default function Delivery() {
 
   function useGPS() {
     const form = document.getElementById('loc-form')
-    if (!navigator.geolocation) { alert('Geolocalización no soportada'); return }
+    if (!navigator.geolocation) { 
+      showToast({ type: 'error', message: 'Geolocalización no soportada en este navegador' })
+      return 
+    }
     navigator.geolocation.getCurrentPosition(pos => {
-      form.querySelector('[name="lat"]').value = pos.coords.latitude
-      form.querySelector('[name="lng"]').value = pos.coords.longitude
-    }, () => alert('No se pudo obtener la ubicación'))
+      form.querySelector('[name="lat"]').value = pos.coords.latitude.toFixed(6)
+      form.querySelector('[name="lng"]').value = pos.coords.longitude.toFixed(6)
+      showToast({ type: 'success', message: '📍 Ubicación obtenida' })
+    }, (error) => {
+      console.error('GPS error:', error)
+      showToast({ type: 'error', message: 'No se pudo obtener la ubicación. Verifica los permisos.' })
+    })
+  }
+
+  function toggleAutoGPS() {
+    if (!navigator.geolocation) {
+      showToast({ type: 'error', message: 'Geolocalización no soportada' })
+      return
+    }
+
+    if (autoGPS) {
+      // Detener tracking automático
+      if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId)
+        setGpsWatchId(null)
+      }
+      setAutoGPS(false)
+      showToast({ type: 'info', message: '📍 Tracking GPS desactivado' })
+    } else {
+      // Iniciar tracking automático
+      const form = document.getElementById('loc-form')
+      const deliveryId = form.querySelector('[name="delivery"]').value
+
+      if (!deliveryId) {
+        showToast({ type: 'warning', message: 'Ingresa un ID de delivery primero' })
+        return
+      }
+
+      const watchId = navigator.geolocation.watchPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude
+          const lng = pos.coords.longitude
+          
+          // Actualizar campos del formulario
+          form.querySelector('[name="lat"]').value = lat.toFixed(6)
+          form.querySelector('[name="lng"]').value = lng.toFixed(6)
+
+          // Enviar ubicación automáticamente cada vez que cambie
+          try {
+            await api('/delivery/location', {
+              method: 'POST',
+              body: JSON.stringify({ id_delivery: deliveryId, lat, lng }),
+              timeout: 5000
+            })
+            console.log('📍 Ubicación actualizada:', lat, lng)
+          } catch (e) {
+            console.error('Error enviando ubicación automática:', e)
+          }
+        },
+        (error) => {
+          console.error('GPS watch error:', error)
+          showToast({ type: 'error', message: 'Error en tracking GPS' })
+          setAutoGPS(false)
+          if (gpsWatchId !== null) {
+            navigator.geolocation.clearWatch(gpsWatchId)
+            setGpsWatchId(null)
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      )
+
+      setGpsWatchId(watchId)
+      setAutoGPS(true)
+      showToast({ type: 'success', message: '📍 Tracking GPS activado' })
+    }
+  }
+
+  // Cleanup al desmontar
+  useEffect(() => {
+    return () => {
+      if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId)
+      }
+      if (simulationIntervalRef.current) {
+        clearInterval(simulationIntervalRef.current)
+      }
+    }
+  }, [gpsWatchId])
+
+  // Función para interpolar entre dos puntos
+  function interpolate(start, end, progress) {
+    return {
+      lat: start.lat + (end.lat - start.lat) * progress,
+      lng: start.lng + (end.lng - start.lng) * progress
+    }
+  }
+
+  // Función para generar puntos intermedios en una ruta (simulando calles)
+  function generateRoutePoints(origin, destination, numPoints = 20) {
+    const points = []
+    
+    // Agregar variación para simular que sigue calles (no línea recta)
+    for (let i = 0; i <= numPoints; i++) {
+      const progress = i / numPoints
+      
+      // Interpolación base
+      const basePoint = interpolate(origin, destination, progress)
+      
+      // Agregar "ruido" para simular calles (más en el medio del trayecto)
+      const noiseAmount = Math.sin(progress * Math.PI) * 0.002 // Máximo ruido en el medio
+      const latNoise = (Math.random() - 0.5) * noiseAmount
+      const lngNoise = (Math.random() - 0.5) * noiseAmount
+      
+      points.push({
+        lat: basePoint.lat + latNoise,
+        lng: basePoint.lng + lngNoise
+      })
+    }
+    
+    return points
+  }
+
+  function startRouteSimulation() {
+    const tenantId = getTenantId()
+    const origin = TENANT_ORIGINS[tenantId]
+    const dest = destRef.current
+
+    if (!origin || !dest) {
+      showToast({ type: 'warning', message: 'Selecciona un delivery con dirección primero' })
+      return
+    }
+
+    // Generar ruta con puntos intermedios
+    const routePoints = generateRoutePoints(origin, dest, 30)
+    
+    setSimulatingRoute(true)
+    setSimulationProgress(0)
+    
+    let currentIndex = 0
+    const totalPoints = routePoints.length
+    const intervalTime = 200 // ms entre cada punto (más rápido = más fluido)
+
+    // Limpiar simulación anterior si existe
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current)
+    }
+
+    // Inicializar mapa si no existe
+    if (!mapRef.current) {
+      mapRef.current = L.map('map').setView([origin.lat, origin.lng], 13)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+        maxZoom: 19, 
+        attribution: '&copy; OpenStreetMap' 
+      }).addTo(mapRef.current)
+    }
+
+    const map = mapRef.current
+
+    // Dibujar ruta completa (línea punteada azul)
+    if (routeRef.current) {
+      map.removeLayer(routeRef.current)
+    }
+    routeRef.current = L.polyline(
+      routePoints.map(p => [p.lat, p.lng]), 
+      { color: '#0ea5e9', dashArray: '6 4', weight: 3, opacity: 0.6 }
+    ).addTo(map)
+
+    // Ajustar vista para mostrar toda la ruta
+    map.fitBounds(routeRef.current.getBounds(), { padding: [50, 50] })
+
+    // Crear marcador de destino
+    if (destRef.current) {
+      L.marker([dest.lat, dest.lng], { icon: markerIcon })
+        .addTo(map)
+        .bindPopup('🏠 Destino')
+    }
+
+    // Crear marcador de origen
+    L.marker([origin.lat, origin.lng], { 
+      icon: L.divIcon({
+        html: '<div style="background: #03592e; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+        className: '',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      })
+    }).addTo(map).bindPopup('🏪 Local')
+
+    // Crear polyline para el track (se irá dibujando)
+    if (polyRef.current) {
+      map.removeLayer(polyRef.current)
+    }
+    polyRef.current = L.polyline([], { color: '#16a34a', weight: 4 }).addTo(map)
+
+    // Crear marcador del delivery (se moverá)
+    if (markerRef.current) {
+      map.removeLayer(markerRef.current)
+    }
+    markerRef.current = L.marker([origin.lat, origin.lng], {
+      icon: L.divIcon({
+        html: '<div style="background: #dc2626; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); animation: pulse 2s infinite;"></div>',
+        className: '',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      })
+    }).addTo(map).bindPopup('🚚 Delivery en camino')
+
+    showToast({ type: 'success', message: '🚚 Simulación de ruta iniciada' })
+
+    // Animar el movimiento
+    simulationIntervalRef.current = setInterval(() => {
+      if (currentIndex >= totalPoints - 1) {
+        clearInterval(simulationIntervalRef.current)
+        setSimulatingRoute(false)
+        setSimulationProgress(100)
+        showToast({ type: 'success', message: '✅ Delivery llegó al destino' })
+        return
+      }
+
+      const currentPoint = routePoints[currentIndex]
+      
+      // Actualizar marcador
+      if (markerRef.current) {
+        markerRef.current.setLatLng([currentPoint.lat, currentPoint.lng])
+      }
+
+      // Actualizar polyline (track recorrido)
+      if (polyRef.current) {
+        const latlngs = routePoints.slice(0, currentIndex + 1).map(p => [p.lat, p.lng])
+        polyRef.current.setLatLngs(latlngs)
+      }
+
+      // Actualizar progreso
+      const progress = Math.round((currentIndex / (totalPoints - 1)) * 100)
+      setSimulationProgress(progress)
+
+      currentIndex++
+    }, intervalTime)
+  }
+
+  function stopRouteSimulation() {
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current)
+      simulationIntervalRef.current = null
+    }
+    setSimulatingRoute(false)
+    showToast({ type: 'info', message: '⏸️ Simulación detenida' })
   }
 
   async function queryDelivery(ev) {
@@ -623,7 +873,105 @@ export default function Delivery() {
               <button className="btn" type="submit">Track</button>
             </form>
             <div id="track-view" className="list" style={{ marginTop: '.75rem' }}></div>
-            <div id="map" className="map"></div>
+            
+            {/* Simulación de ruta */}
+            <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '0.75rem', color: '#0f172a' }}>
+                🎬 Simulación de Ruta
+              </h3>
+              <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '0.75rem' }}>
+                Simula el recorrido del delivery desde el local hasta el destino seleccionado
+              </p>
+              
+              {simulatingRoute && (
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '0.25rem' }}>
+                    <span style={{ color: '#16a34a', fontWeight: 600 }}>En camino...</span>
+                    <span style={{ color: '#64748b' }}>{simulationProgress}%</span>
+                  </div>
+                  <div style={{ 
+                    width: '100%', 
+                    height: '8px', 
+                    background: '#e5e7eb', 
+                    borderRadius: '999px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ 
+                      width: `${simulationProgress}%`, 
+                      height: '100%', 
+                      background: 'linear-gradient(90deg, #16a34a, #22c55e)',
+                      transition: 'width 0.2s ease',
+                      borderRadius: '999px'
+                    }}></div>
+                  </div>
+                </div>
+              )}
+              
+              <button 
+                className={simulatingRoute ? "btn danger" : "btn success"}
+                type="button"
+                onClick={simulatingRoute ? stopRouteSimulation : startRouteSimulation}
+                disabled={!selectedDeliveryId || !destRef.current}
+                style={{ width: '100%' }}
+              >
+                {simulatingRoute ? '⏹️ Detener simulación' : '▶️ Simular ruta'}
+              </button>
+              
+              {!selectedDeliveryId && (
+                <p style={{ fontSize: '11px', color: '#dc2626', marginTop: '0.5rem', textAlign: 'center' }}>
+                  Selecciona un delivery con dirección primero
+                </p>
+              )}
+            </div>
+            
+            <div id="map" className="map" style={{ marginTop: '1rem' }}></div>
+          </div>
+
+          <div className="card">
+            <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>📍 Enviar ubicación GPS</h2>
+            <form 
+              id="loc-form"
+              onSubmit={sendLocation} 
+              className="list"
+              style={{ maxWidth: '420px', margin: '0 auto', width: '100%' }}
+            >
+              <input className="input" name="delivery" placeholder="ID de delivery" required />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <input className="input" name="lat" placeholder="Latitud" required />
+                <input className="input" name="lng" placeholder="Longitud" required />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="btn" type="button" onClick={useGPS} style={{ flex: 1 }}>
+                    🌍 Usar mi ubicación
+                  </button>
+                  <button className="btn primary" type="submit" style={{ flex: 1 }}>
+                    📤 Enviar
+                  </button>
+                </div>
+                <button 
+                  className={autoGPS ? "btn danger" : "btn success"}
+                  type="button" 
+                  onClick={toggleAutoGPS}
+                  style={{ width: '100%' }}
+                >
+                  {autoGPS ? '⏸️ Detener tracking automático' : '▶️ Iniciar tracking automático'}
+                </button>
+                {autoGPS && (
+                  <div style={{ 
+                    padding: '0.5rem', 
+                    background: 'rgba(22, 163, 74, 0.1)', 
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#16a34a',
+                    textAlign: 'center'
+                  }}>
+                    🟢 Tracking GPS activo - Enviando ubicación automáticamente
+                  </div>
+                )}
+              </div>
+            </form>
+            <div id="loc-msg" style={{ marginTop: '.5rem', fontSize: '13px' }}></div>
           </div>
         </aside>
       </section>

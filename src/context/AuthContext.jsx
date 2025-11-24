@@ -138,7 +138,7 @@ export function AuthProvider({ children }) {
 
   const canAccess = (resource) => {
     const permissions = {
-      'kitchen': ['staff', 'admin', 'kitchen'],
+      'kitchen': ['staff', 'admin', 'kitchen', 'cocinero', 'empaquetador'],
       'delivery': ['staff', 'admin', 'delivery'],
       'admin': ['admin'],
       'analytics': ['admin', 'manager']

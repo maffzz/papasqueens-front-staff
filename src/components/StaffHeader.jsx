@@ -26,8 +26,8 @@ export default function StaffHeader() {
   const isActive = (path) => current === path
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '', roles: ['staff', 'admin', 'manager', 'kitchen', 'delivery'] },
-    { path: '/kitchen', label: 'Cocina', icon: '', roles: ['staff', 'admin', 'manager', 'kitchen'] },
+    { path: '/dashboard', label: 'Dashboard', icon: '', roles: ['staff', 'admin', 'manager', 'kitchen', 'delivery', 'cocinero', 'empaquetador'] },
+    { path: '/kitchen', label: 'Cocina', icon: '', roles: ['staff', 'admin', 'manager', 'kitchen', 'cocinero', 'empaquetador'] },
     { path: '/delivery', label: 'Delivery', icon: '', roles: ['staff', 'admin', 'manager', 'delivery'] },
     { path: '/admin/analytics', label: 'Analytics', icon: '', roles: ['admin', 'manager'] }
   ]
@@ -151,7 +151,17 @@ export default function StaffHeader() {
                     {auth.user || auth.id || 'Staff'}
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'capitalize' }}>
-                    {auth.role || 'staff'}
+                    {(() => {
+                      const role = auth.role || 'staff'
+                      const roleLabels = {
+                        'cocinero': '👨‍🍳 Cocinero',
+                        'empaquetador': '📦 Empaquetador',
+                        'delivery': '🚚 Delivery',
+                        'admin': '👔 Admin',
+                        'staff': 'Staff'
+                      }
+                      return roleLabels[role] || role
+                    })()}
                   </div>
                 </div>
               </div>

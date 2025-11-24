@@ -34,32 +34,115 @@ export default function AdminAnalytics() {
   const totalEmployees = Array.isArray(employees) ? employees.length : 0
 
   return (
-    <main className="container section">
-      <h1 className="appTitle" style={{ color:'#03592e', marginBottom: '1rem' }}>Admin · Analytics</h1>
+    <main className="container section" style={{ background: '#f8fafc', minHeight: 'calc(100vh - 64px)', padding: '2rem 1rem' }}>
+      <header style={{ marginBottom: '2rem', textAlign: 'center' }}>
+        <h1 className="appTitle" style={{ color:'#03592e', fontSize: '32px', marginBottom: '0.5rem' }}>
+          📊 Analytics Dashboard
+        </h1>
+        <p style={{ color: '#64748b', fontSize: '14px' }}>
+          Métricas y rendimiento del sistema en tiempo real
+        </p>
+      </header>
 
-      {/* Resumen principal */}
-      <section className="grid" style={{ gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
-        <div className="card" style={{ padding:'1rem 1.25rem' }}>
-          <div style={{ fontSize:'12px', color:'#6b7280', marginBottom:'.25rem' }}>Órdenes totales</div>
-          <div style={{ fontSize:'28px', fontWeight:700, color:'#03592e' }}>{totalOrders}</div>
-          <div style={{ fontSize:'12px', color:'#6b7280', marginTop:'.25rem' }}>Tiempo promedio: {avgOrderTimeMin.toFixed ? avgOrderTimeMin.toFixed(1) : avgOrderTimeMin} min</div>
+      {/* Resumen principal con iconos y gradientes */}
+      <section className="grid" style={{ gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'1.5rem', marginBottom:'2rem' }}>
+        <div className="card" style={{ 
+          padding:'1.5rem', 
+          background: 'linear-gradient(135deg, #03592e 0%, #0a7f4a 100%)',
+          color: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 8px 24px rgba(3, 89, 46, 0.2)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ 
+              width: '56px', 
+              height: '56px', 
+              background: 'rgba(255,255,255,0.2)', 
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '28px'
+            }}>
+              🛒
+            </div>
+            <div>
+              <div style={{ fontSize:'13px', opacity: 0.9, marginBottom:'.25rem' }}>Órdenes Totales</div>
+              <div style={{ fontSize:'36px', fontWeight:700 }}>{totalOrders}</div>
+            </div>
+          </div>
+          <div style={{ fontSize:'13px', opacity: 0.9, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '0.75rem' }}>
+            ⏱️ Tiempo promedio: <strong>{avgOrderTimeMin.toFixed ? avgOrderTimeMin.toFixed(1) : avgOrderTimeMin} min</strong>
+          </div>
         </div>
-        <div className="card" style={{ padding:'1rem 1.25rem' }}>
-          <div style={{ fontSize:'12px', color:'#6b7280', marginBottom:'.25rem' }}>Entregas</div>
-          <div style={{ fontSize:'28px', fontWeight:700, color:'#0369a1' }}>{totalDeliveries || '—'}</div>
-          <div style={{ fontSize:'12px', color:'#6b7280', marginTop:'.25rem' }}>Tiempo promedio: {avgDeliveryTimeMin?.toFixed ? avgDeliveryTimeMin.toFixed(1) : avgDeliveryTimeMin || 0} min</div>
+        
+        <div className="card" style={{ 
+          padding:'1.5rem', 
+          background: 'linear-gradient(135deg, #0369a1 0%, #0284c7 100%)',
+          color: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 8px 24px rgba(3, 105, 161, 0.2)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ 
+              width: '56px', 
+              height: '56px', 
+              background: 'rgba(255,255,255,0.2)', 
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '28px'
+            }}>
+              🚚
+            </div>
+            <div>
+              <div style={{ fontSize:'13px', opacity: 0.9, marginBottom:'.25rem' }}>Entregas</div>
+              <div style={{ fontSize:'36px', fontWeight:700 }}>{totalDeliveries || '—'}</div>
+            </div>
+          </div>
+          <div style={{ fontSize:'13px', opacity: 0.9, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '0.75rem' }}>
+            ⏱️ Tiempo promedio: <strong>{avgDeliveryTimeMin?.toFixed ? avgDeliveryTimeMin.toFixed(1) : avgDeliveryTimeMin || 0} min</strong>
+          </div>
         </div>
-        <div className="card" style={{ padding:'1rem 1.25rem' }}>
-          <div style={{ fontSize:'12px', color:'#6b7280', marginBottom:'.25rem' }}>Colaboradores activos</div>
-          <div style={{ fontSize:'28px', fontWeight:700, color:'#16a34a' }}>{totalEmployees}</div>
-          <div style={{ fontSize:'12px', color:'#6b7280', marginTop:'.25rem' }}>Incluye cocina, despacho y delivery</div>
+        
+        <div className="card" style={{ 
+          padding:'1.5rem', 
+          background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+          color: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 8px 24px rgba(22, 163, 74, 0.2)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ 
+              width: '56px', 
+              height: '56px', 
+              background: 'rgba(255,255,255,0.2)', 
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '28px'
+            }}>
+              👥
+            </div>
+            <div>
+              <div style={{ fontSize:'13px', opacity: 0.9, marginBottom:'.25rem' }}>Colaboradores</div>
+              <div style={{ fontSize:'36px', fontWeight:700 }}>{totalEmployees}</div>
+            </div>
+          </div>
+          <div style={{ fontSize:'13px', opacity: 0.9, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '0.75rem' }}>
+            👨‍🍳 Cocina · 📦 Despacho · 🚚 Delivery
+          </div>
         </div>
       </section>
 
       {/* Distribución de estados de órdenes + top métricas */}
-      <section className="grid" style={{ gridTemplateColumns:'minmax(0,1.2fr) minmax(0,1fr)', gap:'1rem', marginBottom:'1.5rem' }}>
-        <div className="card" style={{ padding:'1rem 1.25rem' }}>
-          <h2 className="appTitle" style={{ fontSize:'18px', marginBottom:'.5rem' }}>Estados de órdenes</h2>
+      <section className="grid" style={{ gridTemplateColumns:'minmax(0,1.2fr) minmax(0,1fr)', gap:'1.5rem', marginBottom:'2rem' }}>
+        <div className="card" style={{ padding:'1.5rem', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+          <h2 className="appTitle" style={{ fontSize:'20px', marginBottom:'1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            📈 Estados de órdenes
+          </h2>
           {!orders ? (
             <div style={{ fontSize:'13px', color:'#9ca3af' }}>Sin datos</div>
           ) : (
@@ -96,8 +179,10 @@ export default function AdminAnalytics() {
           )}
         </div>
 
-        <div className="card" style={{ padding:'1rem 1.25rem' }}>
-          <h2 className="appTitle" style={{ fontSize:'18px', marginBottom:'.5rem' }}>Resumen financiero</h2>
+        <div className="card" style={{ padding:'1.5rem', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' }}>
+          <h2 className="appTitle" style={{ fontSize:'20px', marginBottom:'1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            💰 Resumen financiero
+          </h2>
           {!dashboard ? (
             <div style={{ fontSize:'13px', color:'#9ca3af' }}>Sin datos</div>
           ) : (
@@ -120,8 +205,10 @@ export default function AdminAnalytics() {
       </section>
 
       {/* KPIs de workflow y responsables */}
-      <section className="card" style={{ marginTop: '0.5rem', padding:'1rem 1.25rem' }}>
-        <h2 className="appTitle" style={{ fontSize:'18px', marginBottom:'.75rem' }}>KPIs de workflow</h2>
+      <section className="card" style={{ marginTop: '0.5rem', padding:'1.5rem', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+        <h2 className="appTitle" style={{ fontSize:'20px', marginBottom:'1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          ⚡ KPIs de workflow
+        </h2>
         {!kpis ? (
           <div style={{ fontSize:'13px', color:'#9ca3af' }}>Sin datos de workflow aún.</div>
         ) : (

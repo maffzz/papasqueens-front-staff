@@ -1,4 +1,4 @@
-const API_BASE = 'https://aiu2bl6xja.execute-api.us-east-1.amazonaws.com/dev'
+const API_BASE = 'https://gf3ib7ojeb.execute-api.us-east-1.amazonaws.com/dev'
 function getAuth() { try { return JSON.parse(localStorage.getItem('auth') || '{}') } catch { return {} } }
 function setAuth(a) { localStorage.setItem('auth', JSON.stringify(a || {})) }
 function getTenantId() { try { return localStorage.getItem('tenantId') || (import.meta && import.meta.env && import.meta.env.VITE_TENANT_ID) || '' } catch { return '' } }
@@ -20,6 +20,22 @@ async function api(path, opts = {}) {
   if (tenant && opts.tenantAsQuery === true) url += (url.includes('?') ? '&' : '?') + `tenant_id=${encodeURIComponent(tenant)}`
   
   const timeout = opts.timeout || 30000 // 30 seconds default timeout
+  
+  // Debug logging for login requests
+  if (path.includes('/login')) {
+    console.log('📤 API Request:')
+    console.log('  - URL:', url)
+    console.log('  - Method:', opts.method || 'GET')
+    console.log('  - Headers:', headers)
+    console.log('  - Body:', opts.body)
+    if (opts.body) {
+      try {
+        console.log('  - Body Parsed:', JSON.parse(opts.body))
+      } catch (e) {
+        console.log('  - Body (not JSON):', opts.body)
+      }
+    }
+  }
   
   // Create abort controller for timeout
   const controller = new AbortController()

@@ -96,8 +96,8 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<RequireRole roles={["staff","delivery","admin"]}><Dashboard /></RequireRole>} />
-        <Route path="/kitchen" element={<RequireRole roles={["staff","admin"]}><Kitchen /></RequireRole>} />
+        <Route path="/dashboard" element={<RequireRole roles={["staff","delivery","admin","cocinero","empaquetador"]}><Dashboard /></RequireRole>} />
+        <Route path="/kitchen" element={<RequireRole roles={["staff","admin","cocinero","empaquetador"]}><Kitchen /></RequireRole>} />
         <Route path="/delivery" element={<RequireRole roles={["staff","delivery","admin"]}><Delivery /></RequireRole>} />
         <Route path="/admin/menu" element={<RequireRole role="admin"><AdminMenu /></RequireRole>} />
         <Route path="/admin/staff" element={<RequireRole role="admin"><AdminStaff /></RequireRole>} />

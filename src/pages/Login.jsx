@@ -12,7 +12,7 @@ export default function Login() {
     const current = getTenantId()
     if (current === 'tenant_pq_barranco') return 'barranco'
     if (current === 'tenant_pq_puruchuco') return 'puruchuco'
-    if (current === 'tenant_pq_villa_maria') return 'villa-maria'
+    if (current === 'tenant_pq_villamaria') return 'villa-maria'
     if (current === 'tenant_pq_jiron') return 'jiron'
     return 'barranco'
   })
@@ -23,7 +23,7 @@ export default function Login() {
   const SEDE_OPTIONS = [
     { id: 'barranco', label: 'Sede Barranco (UTEC)', tenant: 'tenant_pq_barranco' },
     { id: 'puruchuco', label: 'Sede Puruchuco', tenant: 'tenant_pq_puruchuco' },
-    { id: 'villa-maria', label: 'Sede Villa María', tenant: 'tenant_pq_villa_maria' },
+    { id: 'villa-maria', label: 'Sede Villa María', tenant: 'tenant_pq_villamaria' },
     { id: 'jiron', label: 'Sede Jirón', tenant: 'tenant_pq_jiron' },
   ]
 
@@ -45,13 +45,22 @@ export default function Login() {
     const username = fd.get('username')?.trim()
     const password = fd.get('password')
     
-    let tenant_id = getTenantId()
-    if (!tenant_id && typeof username === 'string') {
-      const base = username.split('_staff')[0] || username
-      tenant_id = base
-    }
+    // Obtener el tenant_id de la sede seleccionada
+    const selectedOption = SEDE_OPTIONS.find(s => s.id === selectedSede)
+    const tenant_id = selectedOption?.tenant || getTenantId() || 'tenant_pq_barranco'
+    
+    // Asegurarse de que el tenant_id esté actualizado en localStorage
+    setTenantId(tenant_id)
     
     const payload = { username, password, tenant_id }
+    const jsonPayload = JSON.stringify(payload)
+    
+    console.log('🔍 Login Debug:')
+    console.log('  - Selected Sede:', selectedSede)
+    console.log('  - Tenant ID:', tenant_id)
+    console.log('  - Payload Object:', payload)
+    console.log('  - JSON String:', jsonPayload)
+    console.log('  - Parsed back:', JSON.parse(jsonPayload))
     
     // Enhanced validation
     if (!username || !password) {
@@ -72,8 +81,17 @@ export default function Login() {
       const res = await api('/auth/staff/login', { 
         method: 'POST', 
         body: JSON.stringify(payload),
-        timeout: 10000 // 10 second timeout
+        timeout: 10000, // 10 second timeout
+        tenantId: tenant_id, // Asegurar que se envíe en headers también
+        headers: {
+          'X-Tenant-Id': tenant_id // Enviar explícitamente en headers
+        }
       })
+      
+      console.log('✅ Login response:', res)
+      console.log('  - Token:', res.token || res.access_token)
+      console.log('  - Role:', res.role)
+      console.log('  - Tenant ID:', res.tenant_id)
       
       const token = res.token || res.access_token
       const role = res.role || 'staff'
@@ -108,7 +126,9 @@ export default function Login() {
       }, 1000)
       
     } catch (e) {
-      console.error('Login error:', e)
+      console.error('❌ Login error:', e)
+      console.error('  - Error message:', e.message)
+      console.error('  - Error details:', e)
       let errorMsg = 'Error de conexión'
       
       if (e.message.includes('401') || e.message.includes('403')) {
@@ -186,7 +206,7 @@ export default function Login() {
                 background: 'rgba(15,23,42,0.02)',
                 border: '1px solid rgba(148,163,184,0.3)'
               }}>
-                <p style={{ margin: 0, fontSize: '12px', color: '#0f172a', fontWeight: 600 }}>
+                <p style={{ margin: '0 0 0.5rem 0', fontSize: '12px', color: '#0f172a', fontWeight: 600 }}>
                   Indica de qué sede eres staff
                 </p>
                 <select
@@ -199,6 +219,7 @@ export default function Login() {
                     const opt = SEDE_OPTIONS.find(s => s.id === value)
                     if (opt) {
                       setTenantId(opt.tenant)
+                      console.log('🏢 Sede cambiada a:', opt.label, '- Tenant:', opt.tenant)
                     }
                   }}
                   style={{ fontSize: '13px', paddingInline: '0.65rem' }}
@@ -207,6 +228,9 @@ export default function Login() {
                     <option key={opt.id} value={opt.id}>{opt.label}</option>
                   ))}
                 </select>
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>
+                  Tenant: {SEDE_OPTIONS.find(s => s.id === selectedSede)?.tenant || 'N/A'}
+                </p>
               </div>
 
               <div style={{ marginBottom: '0.1rem' }}>

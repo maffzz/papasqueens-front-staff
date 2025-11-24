@@ -2,14 +2,31 @@ import React, { useState } from 'react'
 import { api, formatPrice } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { useKitchenQueue } from '../hooks/useKitchenQueue'
+import { useAuth } from '../context/AuthContext'
 
 export default function Kitchen() {
   const [actionLoading, setActionLoading] = useState({})
   const { showToast } = useToast()
   const { queue, loading, reload } = useKitchenQueue(15000)
+  const { auth } = useAuth()
+  
+  const userRole = auth?.role || 'staff'
+  const isCocinero = userRole === 'cocinero' || userRole === 'admin'
+  const isEmpaquetador = userRole === 'empaquetador' || userRole === 'admin'
 
   async function doAction(kind, id) {
     const actionKey = `${kind}-${id}`
+    
+    // Validar permisos antes de ejecutar
+    if (kind === 'accept' && !isCocinero) {
+      showToast({ type:'error', message: '❌ Solo cocineros pueden aceptar pedidos' })
+      return
+    }
+    if (kind === 'pack' && !isEmpaquetador) {
+      showToast({ type:'error', message: '❌ Solo empaquetadores pueden empacar pedidos' })
+      return
+    }
+    
     setActionLoading(prev => ({ ...prev, [actionKey]: true }))
     
     try {
@@ -89,6 +106,10 @@ export default function Kitchen() {
     const acceptKey = `accept-${orderId}`
     const packKey = `pack-${orderId}`
     const status = String(order.status || order.estado || '').toLowerCase()
+    
+    // Deshabilitar botones según el rol
+    const canAccept = isCocinero && !disableAccept
+    const canPack = isEmpaquetador && !disablePack
 
     return (
       <div
@@ -212,68 +233,88 @@ export default function Kitchen() {
           )}
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button
-              className="btn success"
-              onClick={() => doAction('accept', orderId)}
-              disabled={
-                disableAccept ||
-                actionLoading[acceptKey] ||
-                status !== 'recibido'
-              }
-              style={{
-                flex: 1,
-                opacity:
-                  disableAccept || status !== 'recibido'
-                    ? 0.5
-                    : 1,
-                cursor:
-                  disableAccept || status !== 'recibido'
-                    ? 'not-allowed'
-                    : 'pointer',
-              }}
-            >
-              {actionLoading[acceptKey] ? (
-                <>
-                  <div className="loading" style={{ width: '14px', height: '14px' }}></div>{' '}
-                  Aceptando...
-                </>
-              ) : (
-                <>✅ Aceptar</>
-              )}
-            </button>
-            <button
-              className="btn primary"
-              onClick={() => doAction('pack', orderId)}
-              disabled={
-                disablePack ||
-                actionLoading[packKey] ||
-                status !== 'en_preparacion'
-              }
-              style={{
-                flex: 1,
-                opacity:
-                  disablePack || status !== 'en_preparacion'
-                    ? 0.5
-                    : 1,
-                cursor:
-                  disablePack || status !== 'en_preparacion'
-                    ? 'not-allowed'
-                    : 'pointer',
-              }}
-            >
-              {actionLoading[packKey] ? (
-                <>
-                  <div className="loading" style={{ width: '14px', height: '14px' }}></div>{' '}
-                  Empacando...
-                </>
-              ) : (
-                <>📦 Empacar</>
-              )}
-            </button>
+            {(canAccept || status === 'recibido') && (
+              <button
+                className="btn success"
+                onClick={() => doAction('accept', orderId)}
+                disabled={
+                  !canAccept ||
+                  actionLoading[acceptKey] ||
+                  status !== 'recibido'
+                }
+                style={{
+                  flex: 1,
+                  opacity:
+                    !canAccept || status !== 'recibido'
+                      ? 0.5
+                      : 1,
+                  cursor:
+                    !canAccept || status !== 'recibido'
+                      ? 'not-allowed'
+                      : 'pointer',
+                }}
+                title={!isCocinero ? 'Solo cocineros pueden aceptar pedidos' : ''}
+              >
+                {actionLoading[acceptKey] ? (
+                  <>
+                    <div className="loading" style={{ width: '14px', height: '14px' }}></div>{' '}
+                    Aceptando...
+                  </>
+                ) : (
+                  <>✅ Aceptar</>
+                )}
+              </button>
+            )}
+            {(canPack || status === 'en_preparacion') && (
+              <button
+                className="btn primary"
+                onClick={() => doAction('pack', orderId)}
+                disabled={
+                  !canPack ||
+                  actionLoading[packKey] ||
+                  status !== 'en_preparacion'
+                }
+                style={{
+                  flex: 1,
+                  opacity:
+                    !canPack || status !== 'en_preparacion'
+                      ? 0.5
+                      : 1,
+                  cursor:
+                    !canPack || status !== 'en_preparacion'
+                      ? 'not-allowed'
+                      : 'pointer',
+                }}
+                title={!isEmpaquetador ? 'Solo empaquetadores pueden empacar pedidos' : ''}
+              >
+                {actionLoading[packKey] ? (
+                  <>
+                    <div className="loading" style={{ width: '14px', height: '14px' }}></div>{' '}
+                    Empacando...
+                  </>
+                ) : (
+                  <>📦 Empacar</>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
     )
+  }
+
+  const getRoleTitle = () => {
+    if (userRole === 'cocinero') return '👨‍🍳 Cocina - Cocinero'
+    if (userRole === 'empaquetador') return '📦 Cocina - Empaquetador'
+    if (userRole === 'admin') return '🍳 Cocina - Admin'
+    return '🍳 Cocina'
+  }
+
+  const getRoleDescription = () => {
+    if (userRole === 'cocinero') return 'Acepta y prepara los pedidos'
+    if (userRole === 'empaquetador') return 'Empaca los pedidos listos para entrega'
+    if (userRole === 'admin') return 'Gestiona la cola de pedidos y preparación'
+    return 'Gestiona la cola de pedidos y preparación'
   }
 
   return (
@@ -287,9 +328,9 @@ export default function Kitchen() {
         gap: '1rem'
       }}>
         <div>
-          <h1 className="appTitle" style={{ marginBottom: '0.5rem' }}>🍳 Cocina</h1>
+          <h1 className="appTitle" style={{ marginBottom: '0.5rem' }}>{getRoleTitle()}</h1>
           <p style={{ color: '#64748b', margin: 0 }}>
-            Gestiona la cola de pedidos y preparación
+            {getRoleDescription()}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -342,13 +383,13 @@ export default function Kitchen() {
                 alignItems: 'flex-start',
               }}
             >
-              {acceptQueue.length > 0 && (
+              {acceptQueue.length > 0 && (isCocinero || userRole === 'admin') && (
                 <div>
                   <h2
                     className="appTitle"
                     style={{ fontSize: '16px', marginBottom: '.5rem', color: '#0f172a' }}
                   >
-                    Por aceptar
+                    👨‍🍳 Por aceptar {!isCocinero && '(Solo cocineros)'}
                   </h2>
                   <div
                     className="grid"
@@ -361,13 +402,13 @@ export default function Kitchen() {
                 </div>
               )}
 
-              {packQueue.length > 0 && (
+              {packQueue.length > 0 && (isEmpaquetador || userRole === 'admin') && (
                 <div>
                   <h2
                     className="appTitle"
                     style={{ fontSize: '16px', marginBottom: '.5rem', color: '#0f172a' }}
                   >
-                    Por empacar
+                    📦 Por empacar {!isEmpaquetador && '(Solo empaquetadores)'}
                   </h2>
                   <div
                     className="grid"
@@ -379,6 +420,37 @@ export default function Kitchen() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+          
+          {/* Mensaje cuando no hay pedidos para el rol específico */}
+          {!isCocinero && !isEmpaquetador && visibleQueue.length > 0 && (
+            <div className="card" style={{ textAlign: 'center', padding: '2rem', background: 'rgba(234, 179, 8, 0.1)' }}>
+              <div style={{ fontSize: '32px', marginBottom: '1rem' }}>⚠️</div>
+              <h3 style={{ color: '#92400e', marginBottom: '0.5rem' }}>Rol no reconocido</h3>
+              <p style={{ color: '#92400e', margin: 0 }}>
+                Tu rol actual no tiene permisos para gestionar pedidos en cocina
+              </p>
+            </div>
+          )}
+          
+          {userRole === 'cocinero' && acceptQueue.length === 0 && packQueue.length > 0 && (
+            <div className="card" style={{ textAlign: 'center', padding: '2rem', background: 'rgba(22, 163, 74, 0.1)' }}>
+              <div style={{ fontSize: '32px', marginBottom: '1rem' }}>✅</div>
+              <h3 style={{ color: '#16a34a', marginBottom: '0.5rem' }}>No hay pedidos por aceptar</h3>
+              <p style={{ color: '#15803d', margin: 0 }}>
+                Hay {packQueue.length} pedido(s) esperando ser empacado(s) por el empaquetador
+              </p>
+            </div>
+          )}
+          
+          {userRole === 'empaquetador' && packQueue.length === 0 && acceptQueue.length > 0 && (
+            <div className="card" style={{ textAlign: 'center', padding: '2rem', background: 'rgba(22, 163, 74, 0.1)' }}>
+              <div style={{ fontSize: '32px', marginBottom: '1rem' }}>⏳</div>
+              <h3 style={{ color: '#16a34a', marginBottom: '0.5rem' }}>No hay pedidos listos para empacar</h3>
+              <p style={{ color: '#15803d', margin: 0 }}>
+                Hay {acceptQueue.length} pedido(s) esperando ser aceptado(s) por el cocinero
+              </p>
             </div>
           )}
         </>
