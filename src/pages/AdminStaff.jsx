@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api, getTenantId } from '../api/client'
 import { useToast } from '../context/ToastContext'
+import AppLayout from '../components/AppLayout'
 
 export default function AdminStaff() {
   const [staff, setStaff] = useState([])
@@ -39,11 +40,12 @@ export default function AdminStaff() {
   }
 
   return (
-    <main className="container section">
-      <h1 className="appTitle" style={{ color:'#03592e' }}>Admin: Staff</h1>
+    <AppLayout title="👥 Personal">
 
-      <div className="card">
-        <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Crear Staff</h2>
+      <div className="card" style={{ borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', padding: '1.5rem' }}>
+        <h2 className="appTitle" style={{ marginBottom: '1rem', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          ➕ Crear colaborador
+        </h2>
         <form onSubmit={create} className="list">
           <input className="input" name="id_staff" placeholder="ID staff" required />
           <input className="input" name="name" placeholder="Nombre" required />
@@ -57,25 +59,54 @@ export default function AdminStaff() {
         </form>
       </div>
 
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <h2 className="appTitle" style={{ marginBottom: '.5rem' }}>Listado</h2>
+      <div className="card" style={{ marginTop: '1.5rem', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', padding: '1.5rem' }}>
+        <h2 className="appTitle" style={{ marginBottom: '1rem', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          📋 Listado de colaboradores
+        </h2>
         <div className="list">
-          {staff.map(s => (
-            <div className="card" key={s.id_staff}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div>
-                  <div><strong>{s.name || s.nombre}</strong> <small>(ID: {s.id_staff})</small></div>
-                  <div style={{ color:'#666' }}>Rol: {s.role || s.rol || 'staff'}</div>
-                </div>
-                <div style={{ display:'flex', gap:'.5rem' }}>
-                  <button className="btn" onClick={() => update(s.id_staff)}>Editar</button>
+          {staff.map(s => {
+            const role = (s.role || s.rol || 'staff').toLowerCase()
+            const roleIcon = role === 'admin' ? '👑' : role === 'delivery' ? '🚚' : '👨‍🍳'
+            const roleColor = role === 'admin' ? '#dc2626' : role === 'delivery' ? '#0369a1' : '#03592e'
+            return (
+              <div className="card" key={s.id_staff} style={{ 
+                borderLeft: `4px solid ${roleColor}`,
+                transition: 'all 0.2s ease'
+              }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                      <span style={{ fontSize: '20px' }}>{roleIcon}</span>
+                      <strong style={{ fontSize: '16px' }}>{s.name || s.nombre}</strong>
+                      <small style={{ color: '#64748b' }}>(ID: {s.id_staff})</small>
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#64748b' }}>
+                      📧 {s.email}
+                    </div>
+                    <div style={{ 
+                      marginTop: '0.5rem',
+                      display: 'inline-block',
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      background: `${roleColor}20`,
+                      color: roleColor,
+                      textTransform: 'capitalize'
+                    }}>
+                      {role}
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:'.5rem' }}>
+                    <button className="btn" onClick={() => update(s.id_staff)}>✏️ Editar</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
         <div style={{ marginTop: '.5rem', color:'#666' }}>{msg}</div>
       </div>
-    </main>
+    </AppLayout>
   )
 }

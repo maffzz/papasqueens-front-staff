@@ -3,6 +3,7 @@ import { api, formatPrice } from '../api/client'
 import { useToast } from '../context/ToastContext'
 import { useKitchenQueue } from '../hooks/useKitchenQueue'
 import { useAuth } from '../context/AuthContext'
+import AppLayout from '../components/AppLayout'
 
 export default function Kitchen() {
   const [actionLoading, setActionLoading] = useState({})
@@ -17,7 +18,6 @@ export default function Kitchen() {
   async function doAction(kind, id) {
     const actionKey = `${kind}-${id}`
     
-    // Validar permisos antes de ejecutar
     if (kind === 'accept' && !isCocinero) {
       showToast({ type:'error', message: '❌ Solo cocineros pueden aceptar pedidos' })
       return
@@ -46,30 +46,6 @@ export default function Kitchen() {
     } finally {
       setActionLoading(prev => ({ ...prev, [actionKey]: false }))
     }
-  }
-
-  const getStatusBadge = (order) => {
-    const rawStatus = order.status || order.estado || 'recibido'
-    const status = String(rawStatus).toLowerCase()
-    const statusConfig = {
-      pending:          { class: 'warning', text: 'Pendiente',           icon: '⏳' },
-      accepted:         { class: 'info',    text: 'Aceptado',            icon: '👨‍🍳' },
-      preparing:        { class: 'info',    text: 'Preparando',          icon: '🔥' },
-      ready:            { class: 'success', text: 'Listo',               icon: '✅' },
-      packed:           { class: 'success', text: 'Empacado',            icon: '📦' },
-      delivered:        { class: 'success', text: 'Entregado',           icon: '🚚' },
-      cancelled:        { class: 'danger',  text: 'Cancelado',           icon: '❌' },
-      recibido:         { class: 'warning', text: 'Pendiente',           icon: '⏳' },
-      en_preparacion:   { class: 'info',    text: 'En preparación',      icon: '🔥' },
-      listo_para_entrega:{ class: 'success', text: 'Listo para entrega', icon: '📦' },
-    }
-
-    const config = statusConfig[status] || statusConfig.recibido
-    return (
-      <span className={`badge ${config.class}`}>
-        {config.icon} {config.text}
-      </span>
-    )
   }
 
   const getTimeAgo = (timestamp) => {
@@ -107,354 +83,238 @@ export default function Kitchen() {
     const packKey = `pack-${orderId}`
     const status = String(order.status || order.estado || '').toLowerCase()
     
-    // Deshabilitar botones según el rol
     const canAccept = isCocinero && !disableAccept
     const canPack = isEmpaquetador && !disablePack
+
+    const paymentStatus = String(order.payment_status || order.estado_pago || '').toLowerCase()
+    const isPaid = paymentStatus === 'paid' || paymentStatus === 'pagado'
+    const total = Number(order.total || 0)
 
     return (
       <div
         className="card"
         key={orderId}
         style={{
-          position: 'relative',
-          borderLeft: '4px solid',
-          borderLeftColor:
-            order.priority === 'high'
-              ? '#dc2626'
-              : order.priority === 'medium'
-              ? '#eab308'
-              : '#03592E',
+          borderLeft: order.priority === 'high' ? '4px solid var(--status-urgent)' : '4px solid var(--queens-orange)'
         }}
       >
-        {order.priority === 'high' && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '1rem',
-              right: '1rem',
-              background: '#dc2626',
-              color: 'white',
-              padding: '0.25rem 0.5rem',
-              borderRadius: '4px',
-              fontSize: '11px',
-              fontWeight: '600',
-            }}
-          >
-            ⚡ URGENTE
+        {/* Header del pedido */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-lg)' }}>
+          <div>
+            <h3 style={{ 
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              color: 'var(--queens-green)',
+              margin: '0 0 0.25rem 0'
+            }}>
+              🍽️ Pedido #{orderId}
+            </h3>
+            <div style={{ fontSize: '0.875rem', color: 'var(--neutral-500)' }}>
+              {getTimeAgo(order.created_at || order.timestamp)}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ 
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              color: 'var(--queens-green)',
+              marginBottom: '0.25rem'
+            }}>
+              {isPaid || total === 0 ? '✅ Pagado' : formatPrice(total)}
+            </div>
+            {order.priority === 'high' && (
+              <span className="badge badge-urgent">⚡ URGENTE</span>
+            )}
+          </div>
+        </div>
+
+        {/* Info del cliente */}
+        <div style={{ marginBottom: 'var(--spacing-lg)', padding: 'var(--spacing-md)', background: 'var(--warm-cream)', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ fontSize: '0.9375rem', color: 'var(--neutral-700)', marginBottom: '0.25rem' }}>
+            👤 {order.customer_name || order.customer || 'Cliente no registrado'}
+          </div>
+          {order.phone && (
+            <div style={{ fontSize: '0.875rem', color: 'var(--neutral-600)' }}>
+              📞 {order.phone}
+            </div>
+          )}
+          {order.delivery_address && (
+            <div style={{ fontSize: '0.875rem', color: 'var(--neutral-600)' }}>
+              📍 {order.delivery_address}
+            </div>
+          )}
+        </div>
+
+        {/* Items del pedido */}
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <h4 style={{ 
+            fontSize: '0.9375rem',
+            fontWeight: 600,
+            color: 'var(--neutral-700)',
+            marginBottom: 'var(--spacing-sm)'
+          }}>
+            🛒 Items del pedido:
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+            {(order.items || []).map((item, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: 'var(--spacing-sm) var(--spacing-md)',
+                  background: 'white',
+                  border: '1px solid var(--neutral-200)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.9375rem'
+                }}
+              >
+                <span style={{ fontWeight: 500 }}>
+                  <strong style={{ color: 'var(--queens-orange)' }}>{item.cantidad || item.qty || 1}×</strong> {item.nombre || item.name}
+                </span>
+                <span style={{ fontWeight: 600, color: 'var(--queens-green)' }}>
+                  {formatPrice(item.price || 0)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Notas especiales */}
+        {order.notes && (
+          <div style={{
+            padding: 'var(--spacing-md)',
+            background: 'rgba(255, 184, 0, 0.1)',
+            border: '1px solid var(--queens-gold)',
+            borderRadius: 'var(--radius-md)',
+            fontSize: '0.875rem',
+            color: 'var(--neutral-700)',
+            marginBottom: 'var(--spacing-lg)'
+          }}>
+            <strong>📝 Notas:</strong> {order.notes}
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <h3 style={{ margin: '0 0 0.25rem 0', color: '#03592E' }}>
-                Pedido #{orderId}
-              </h3>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>
-                {getTimeAgo(order.created_at || order.timestamp)}
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="price" style={{ fontSize: '1.1rem' }}>
-                {(() => {
-                  const paymentStatus = String(order.payment_status || order.estado_pago || '').toLowerCase()
-                  const isPaid = paymentStatus === 'paid' || paymentStatus === 'pagado'
-                  const total = Number(order.total || 0)
-                  if (isPaid || total === 0) return 'Pagado'
-                  return formatPrice(total)
-                })()}
-              </div>
-              {getStatusBadge(order)}
-            </div>
-          </div>
-
-          <div>
-            {(() => {
-              const name = order.customer_name || order.customer
-              const addr = order.delivery_address
-              const label = name || (addr ? `Cliente en ${addr}` : 'Cliente no registrado')
-              return (
-                <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '0.5rem' }}>
-                  👤 {label}
-                </div>
-              )
-            })()}
-            {order.phone && (
-              <div style={{ fontSize: '14px', color: '#64748b' }}>
-                📞 {order.phone}
-              </div>
-            )}
-            {order.delivery_address && (
-              <div style={{ fontSize: '14px', color: '#64748b' }}>
-                📍 {order.delivery_address}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '14px', color: '#03592E' }}>🛒 Items:</h4>
-            <div className="list" style={{ gap: '0.5rem', paddingLeft: '0' }}>
-              {(order.items || []).map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '0.5rem',
-                    background: '#f8fafc',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                  }}
-                >
-                  <span>
-                    {item.cantidad || item.qty || 1} × {item.nombre || item.name}
-                  </span>
-                  <span style={{ fontWeight: '500', color: '#03592E' }}>
-                    {formatPrice(item.price || 0)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {order.notes && (
-            <div
-              style={{
-                padding: '0.75rem',
-                background: 'rgba(234, 179, 8, 0.1)',
-                border: '1px solid rgba(234, 179, 8, 0.2)',
-                borderRadius: '6px',
-                fontSize: '13px',
-                color: '#92400e',
-              }}
+        {/* Botones de acción */}
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          {(canAccept || status === 'recibido') && (
+            <button
+              className="btn btn-success"
+              onClick={() => doAction('accept', orderId)}
+              disabled={!canAccept || actionLoading[acceptKey] || status !== 'recibido'}
+              style={{ flex: 1 }}
             >
-              <strong>📝 Notas:</strong> {order.notes}
-            </div>
+              {actionLoading[acceptKey] ? (
+                <><div className="loading"></div> Aceptando...</>
+              ) : (
+                <>✅ Aceptar pedido</>
+              )}
+            </button>
           )}
-
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {(canAccept || status === 'recibido') && (
-              <button
-                className="btn success"
-                onClick={() => doAction('accept', orderId)}
-                disabled={
-                  !canAccept ||
-                  actionLoading[acceptKey] ||
-                  status !== 'recibido'
-                }
-                style={{
-                  flex: 1,
-                  opacity:
-                    !canAccept || status !== 'recibido'
-                      ? 0.5
-                      : 1,
-                  cursor:
-                    !canAccept || status !== 'recibido'
-                      ? 'not-allowed'
-                      : 'pointer',
-                }}
-                title={!isCocinero ? 'Solo cocineros pueden aceptar pedidos' : ''}
-              >
-                {actionLoading[acceptKey] ? (
-                  <>
-                    <div className="loading" style={{ width: '14px', height: '14px' }}></div>{' '}
-                    Aceptando...
-                  </>
-                ) : (
-                  <>✅ Aceptar</>
-                )}
-              </button>
-            )}
-            {(canPack || status === 'en_preparacion') && (
-              <button
-                className="btn primary"
-                onClick={() => doAction('pack', orderId)}
-                disabled={
-                  !canPack ||
-                  actionLoading[packKey] ||
-                  status !== 'en_preparacion'
-                }
-                style={{
-                  flex: 1,
-                  opacity:
-                    !canPack || status !== 'en_preparacion'
-                      ? 0.5
-                      : 1,
-                  cursor:
-                    !canPack || status !== 'en_preparacion'
-                      ? 'not-allowed'
-                      : 'pointer',
-                }}
-                title={!isEmpaquetador ? 'Solo empaquetadores pueden empacar pedidos' : ''}
-              >
-                {actionLoading[packKey] ? (
-                  <>
-                    <div className="loading" style={{ width: '14px', height: '14px' }}></div>{' '}
-                    Empacando...
-                  </>
-                ) : (
-                  <>📦 Empacar</>
-                )}
-              </button>
-            )}
-          </div>
+          {(canPack || status === 'en_preparacion') && (
+            <button
+              className="btn btn-warning"
+              onClick={() => doAction('pack', orderId)}
+              disabled={!canPack || actionLoading[packKey] || status !== 'en_preparacion'}
+              style={{ flex: 1 }}
+            >
+              {actionLoading[packKey] ? (
+                <><div className="loading"></div> Empacando...</>
+              ) : (
+                <>📦 Empacar</>
+              )}
+            </button>
+          )}
         </div>
       </div>
     )
   }
 
-  const getRoleTitle = () => {
-    if (userRole === 'cocinero') return '👨‍🍳 Cocina - Cocinero'
-    if (userRole === 'empaquetador') return '📦 Cocina - Empaquetador'
-    if (userRole === 'admin') return '🍳 Cocina - Admin'
-    return '🍳 Cocina'
-  }
-
-  const getRoleDescription = () => {
-    if (userRole === 'cocinero') return 'Acepta y prepara los pedidos'
-    if (userRole === 'empaquetador') return 'Empaca los pedidos listos para entrega'
-    if (userRole === 'admin') return 'Gestiona la cola de pedidos y preparación'
-    return 'Gestiona la cola de pedidos y preparación'
-  }
-
   return (
-    <main className="container section">
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: '2rem',
-        flexWrap: 'wrap',
-        gap: '1rem'
-      }}>
-        <div>
-          <h1 className="appTitle" style={{ marginBottom: '0.5rem' }}>{getRoleTitle()}</h1>
-          <p style={{ color: '#64748b', margin: 0 }}>
-            {getRoleDescription()}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button className="btn" onClick={reload} disabled={loading}>
-            {loading ? (
-              <><div className="loading" style={{ width: '16px', height: '16px' }}></div> Actualizando...</>
-            ) : (
-              <>🔄 Actualizar</>
-            )}
+    <AppLayout title="🍳 Cocina">
+      {/* Header con stats */}
+      <div className="card" style={{ marginBottom: 'var(--spacing-xl)', background: 'linear-gradient(135deg, var(--warm-cream), var(--warm-beige))' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ 
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: 'var(--queens-green)',
+              margin: '0 0 0.5rem 0'
+            }}>
+              Cola de Pedidos
+            </h2>
+            <p style={{ fontSize: '0.9375rem', color: 'var(--neutral-600)', margin: 0 }}>
+              📊 {visibleQueue.length} pedidos en cola • {acceptQueue.length} por aceptar • {packQueue.length} por empacar
+            </p>
+          </div>
+          <button className="btn btn-secondary" onClick={reload} disabled={loading}>
+            {loading ? <><div className="loading"></div> Actualizando...</> : <>🔄 Actualizar</>}
           </button>
         </div>
       </div>
 
+      {/* Contenido principal */}
       {loading && visibleQueue.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
           <div className="loading" style={{ width: '40px', height: '40px', margin: '0 auto 1rem' }}></div>
-          <p style={{ color: '#64748b' }}>Cargando cola de pedidos...</p>
+          <p style={{ color: 'var(--neutral-600)' }}>Cargando cola de pedidos...</p>
         </div>
       ) : visibleQueue.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🍽️</div>
-          <h3 style={{ color: '#03592E', marginBottom: '0.5rem' }}>No hay pedidos en cola</h3>
-          <p style={{ color: '#64748b', margin: 0 }}>
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
+          <div style={{ fontSize: '4rem', marginBottom: 'var(--spacing-lg)' }}>🍽️</div>
+          <h3 style={{ color: 'var(--queens-green)', marginBottom: 'var(--spacing-sm)' }}>No hay pedidos en cola</h3>
+          <p style={{ color: 'var(--neutral-600)', margin: 0 }}>
             Todos los pedidos están siendo procesados o no hay nuevos pedidos
           </p>
         </div>
       ) : (
-        <>
-          <div style={{ 
-            marginBottom: '1.5rem', 
-            padding: '1rem', 
-            background: 'rgba(3, 89, 46, 0.05)', 
-            borderRadius: '8px',
-            border: '1px solid rgba(3, 89, 46, 0.1)'
-          }}>
-            <p style={{ margin: 0, color: '#03592E', fontWeight: '500' }}>
-              📊 {visibleQueue.length} pedidos en cola ({acceptQueue.length} por aceptar, {packQueue.length} por empacar)
-            </p>
-          </div>
+        <div className="grid" style={{ gridTemplateColumns: acceptQueue.length > 0 && packQueue.length > 0 ? 'repeat(2, 1fr)' : '1fr', gap: 'var(--spacing-xl)', alignItems: 'start' }}>
+          {/* Columna: Por Aceptar */}
+          {acceptQueue.length > 0 && (isCocinero || userRole === 'admin') && (
+            <div>
+              <h3 style={{ 
+                fontFamily: 'var(--font-display)',
+                fontSize: '1.125rem',
+                fontWeight: 700,
+                color: 'var(--queens-orange)',
+                marginBottom: 'var(--spacing-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-sm)'
+              }}>
+                👨‍🍳 Por Aceptar ({acceptQueue.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+                {acceptQueue.map(order => renderOrderCard(order, { disableAccept: false, disablePack: true }))}
+              </div>
+            </div>
+          )}
 
-          {(acceptQueue.length > 0 || packQueue.length > 0) && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns:
-                  acceptQueue.length > 0 && packQueue.length > 0
-                    ? 'minmax(0,1fr) minmax(0,1fr)'
-                    : 'minmax(0,1fr)',
-                gap: '1.25rem',
-                alignItems: 'flex-start',
-              }}
-            >
-              {acceptQueue.length > 0 && (isCocinero || userRole === 'admin') && (
-                <div>
-                  <h2
-                    className="appTitle"
-                    style={{ fontSize: '16px', marginBottom: '.5rem', color: '#0f172a' }}
-                  >
-                    👨‍🍳 Por aceptar {!isCocinero && '(Solo cocineros)'}
-                  </h2>
-                  <div
-                    className="grid"
-                    style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))' }}
-                  >
-                    {acceptQueue.map(order =>
-                      renderOrderCard(order, { disableAccept: false, disablePack: true })
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {packQueue.length > 0 && (isEmpaquetador || userRole === 'admin') && (
-                <div>
-                  <h2
-                    className="appTitle"
-                    style={{ fontSize: '16px', marginBottom: '.5rem', color: '#0f172a' }}
-                  >
-                    📦 Por empacar {!isEmpaquetador && '(Solo empaquetadores)'}
-                  </h2>
-                  <div
-                    className="grid"
-                    style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))' }}
-                  >
-                    {packQueue.map(order =>
-                      renderOrderCard(order, { disableAccept: true, disablePack: false })
-                    )}
-                  </div>
-                </div>
-              )}
+          {/* Columna: Por Empacar */}
+          {packQueue.length > 0 && (isEmpaquetador || userRole === 'admin') && (
+            <div>
+              <h3 style={{ 
+                fontFamily: 'var(--font-display)',
+                fontSize: '1.125rem',
+                fontWeight: 700,
+                color: 'var(--queens-gold)',
+                marginBottom: 'var(--spacing-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-sm)'
+              }}>
+                📦 Por Empacar ({packQueue.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+                {packQueue.map(order => renderOrderCard(order, { disableAccept: true, disablePack: false }))}
+              </div>
             </div>
           )}
-          
-          {/* Mensaje cuando no hay pedidos para el rol específico */}
-          {!isCocinero && !isEmpaquetador && visibleQueue.length > 0 && (
-            <div className="card" style={{ textAlign: 'center', padding: '2rem', background: 'rgba(234, 179, 8, 0.1)' }}>
-              <div style={{ fontSize: '32px', marginBottom: '1rem' }}>⚠️</div>
-              <h3 style={{ color: '#92400e', marginBottom: '0.5rem' }}>Rol no reconocido</h3>
-              <p style={{ color: '#92400e', margin: 0 }}>
-                Tu rol actual no tiene permisos para gestionar pedidos en cocina
-              </p>
-            </div>
-          )}
-          
-          {userRole === 'cocinero' && acceptQueue.length === 0 && packQueue.length > 0 && (
-            <div className="card" style={{ textAlign: 'center', padding: '2rem', background: 'rgba(22, 163, 74, 0.1)' }}>
-              <div style={{ fontSize: '32px', marginBottom: '1rem' }}>✅</div>
-              <h3 style={{ color: '#16a34a', marginBottom: '0.5rem' }}>No hay pedidos por aceptar</h3>
-              <p style={{ color: '#15803d', margin: 0 }}>
-                Hay {packQueue.length} pedido(s) esperando ser empacado(s) por el empaquetador
-              </p>
-            </div>
-          )}
-          
-          {userRole === 'empaquetador' && packQueue.length === 0 && acceptQueue.length > 0 && (
-            <div className="card" style={{ textAlign: 'center', padding: '2rem', background: 'rgba(22, 163, 74, 0.1)' }}>
-              <div style={{ fontSize: '32px', marginBottom: '1rem' }}>⏳</div>
-              <h3 style={{ color: '#16a34a', marginBottom: '0.5rem' }}>No hay pedidos listos para empacar</h3>
-              <p style={{ color: '#15803d', margin: 0 }}>
-                Hay {acceptQueue.length} pedido(s) esperando ser aceptado(s) por el cocinero
-              </p>
-            </div>
-          )}
-        </>
+        </div>
       )}
-    </main>
+    </AppLayout>
   )
 }

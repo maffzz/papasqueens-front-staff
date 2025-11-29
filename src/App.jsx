@@ -1,6 +1,5 @@
 import React, { Component } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import StaffHeader from './components/StaffHeader'
 import { AuthProvider, RequireRole, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import Login from './pages/Login'
@@ -91,19 +90,16 @@ function AppContent() {
 
   // Si hay usuario autenticado, mostramos el layout completo con Dashboard como raíz
   return (
-    <>
-      <StaffHeader />
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<RequireRole roles={["staff","delivery","admin","cocinero","empaquetador"]}><Dashboard /></RequireRole>} />
-        <Route path="/kitchen" element={<RequireRole roles={["staff","admin","cocinero","empaquetador"]}><Kitchen /></RequireRole>} />
-        <Route path="/delivery" element={<RequireRole roles={["staff","delivery","admin"]}><Delivery /></RequireRole>} />
-        <Route path="/admin/menu" element={<RequireRole role="admin"><AdminMenu /></RequireRole>} />
-        <Route path="/admin/staff" element={<RequireRole role="admin"><AdminStaff /></RequireRole>} />
-        <Route path="/admin/analytics" element={<RequireRole role="admin"><AdminAnalytics /></RequireRole>} />
-      </Routes>
-    </>
+    <Routes>
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/dashboard" element={<RequireRole roles={["staff","delivery","admin","cocinero","empaquetador"]}><Dashboard /></RequireRole>} />
+      <Route path="/kitchen" element={<RequireRole roles={["staff","admin","cocinero","empaquetador"]}><Kitchen /></RequireRole>} />
+      <Route path="/delivery" element={<RequireRole roles={["staff","delivery","admin"]}><Delivery /></RequireRole>} />
+      <Route path="/admin/menu" element={<RequireRole role="admin"><AdminMenu /></RequireRole>} />
+      <Route path="/admin/staff" element={<RequireRole role="admin"><AdminStaff /></RequireRole>} />
+      <Route path="/admin/analytics" element={<RequireRole role="admin"><AdminAnalytics /></RequireRole>} />
+    </Routes>
   )
 }
 

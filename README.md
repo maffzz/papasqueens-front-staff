@@ -1,158 +1,242 @@
-# Papas Queen's - Frontend Staff 🥔👑
+# 🍟 Papas Queen's - Staff Portal
 
-Este proyecto es el **frontend de staff / administración** de Papas Queen's, construido con **React + Vite**. Permite que cocina, reparto y administradores gestionen pedidos, menú, personal y analítica de la operación. 🚀
+Sistema de gestión operacional para restaurantes con identidad gastronómica profesional.
 
----
+## 🎨 Características del Diseño
 
-## 1. Stack y dependencias principales 🧱
+### Identidad Visual
+- **Paleta de colores corporativa**: Verde marca (#03592E), Dorado papas (#FFB800), Naranja comida (#FF6B35)
+- **Tipografía moderna**: Inter para contenido + Poppins para títulos
+- **Iconografía gastronómica**: 🍟👨‍🍳🚚📦 integrados en toda la interfaz
+- **Layout profesional**: Sidebar + TopBar + Content area con navegación fluida
 
-- **React 18** (`react`, `react-dom`).
-- **React Router 6** (`react-router-dom`) para el enrutamiento SPA.
-- **Vite** como bundler y dev server.
-- **Leaflet** (`leaflet`) para funcionalidades de mapa (tracking de repartidores, etc. si se habilita).
+### Componentes Principales
+- **Sidebar**: Navegación con iconos temáticos y estados activos
+- **TopBar**: Información de sede, estado de conexión y perfil de usuario
+- **Cards**: Diseño moderno con hover effects y gradientes
+- **Badges**: Estados visuales para pedidos y entregas
 
-> 📦 Ver `package.json` para la lista completa de dependencias.
+## 📦 Módulos del Sistema
 
----
+### 🏠 Dashboard
+Panel principal con acceso rápido a todos los módulos según rol del usuario.
 
-## 2. Integración con el backend 🧬
+### 👨‍🍳 Kitchen (Cocina)
+- Cola de pedidos en tiempo real
+- Estados: Pendiente → En preparación → Listo
+- Gestión de tiempos de preparación
+- Interfaz optimizada para ambiente de cocina
 
-Este frontend de staff está diseñado para consumir **todos los microservicios del backend** desplegados en AWS a través de API Gateway:
+### 🚚 Delivery
+- Gestión de entregas activas
+- Asignación de repartidores
+- Tracking GPS en tiempo real
+- Simulación de rutas
+- Estados: Listo para entrega → En camino → Entregado
 
-- **`orders-svc`** 🧾 – gestión del ciclo de vida de pedidos.
-- **`kitchen-svc`** 👩‍🍳 – cola de cocina, menú y staff interno.
-- **`delivery-svc`** 🛵 – asignación y seguimiento de entregas.
-- **`analytics-svc`** 📊 – dashboards y métricas operativas.
-- **`register`** 🔐 – login de staff.
+### 📊 Analytics (Admin)
+- Métricas de órdenes y entregas
+- KPIs de workflow
+- Tiempos promedio por etapa
+- Top responsables por proceso
+- Dashboard financiero
 
-Toda la comunicación HTTP se realiza a través de `src/api/client.js`, que encapsula:
+### 🍟 Admin Menu
+- Gestión de productos del menú
+- Categorías y precios
+- Imágenes de productos
+- Disponibilidad en tiempo real
 
-- Base URL del API Gateway: `https://id8sfymfb7.execute-api.us-east-1.amazonaws.com/dev`.
-- Headers de autenticación y multi-tenant (`Authorization`, `X-Tenant-Id`, `X-User-Id`, `X-User-Email`, `X-User-Type`).
-- Manejo de timeouts (30s por defecto) y reintentos (`retryApi`).
-- Utilidades para precios, distancias (haversine) y duración estimada.
+### 👥 Admin Staff
+- Gestión de colaboradores
+- Roles: Admin, Staff (Cocina), Delivery
+- Estados y permisos
+- Información de contacto
 
-> 🧩 Este frontend es el consumidor "principal" de la mayoría de endpoints del backend: cocina, delivery, administración y analytics.
+## 🛠️ Stack Tecnológico
 
----
+- **Frontend**: React 18 + Vite
+- **Routing**: React Router v6
+- **Estilos**: CSS Variables + Custom Design System
+- **Mapas**: Leaflet para tracking GPS
+- **API**: REST con autenticación JWT
+- **Multi-tenancy**: Soporte para múltiples sedes
 
-## 3. Páginas y flujo principal 📄
-
-Las rutas se definen en `src/App.jsx` usando `Routes` y `RequireRole` para proteger secciones por rol.
-
-- **`/` – Login (`Login.jsx`)** 🔐
-  - Pantalla de inicio de sesión para staff, delivery y admin.
-  - Usa el endpoint `POST /auth/staff/login` del microservicio `register`.
-
-- **`/dashboard` – Panel general (`Dashboard.jsx`)** 📊
-  - Vista rápida del estado del sistema: pedidos activos, métricas clave, atajos a cocina/delivery.
-  - Consume endpoints de `orders-svc` y `analytics-svc`.
-
-- **`/kitchen` – Cocina (`Kitchen.jsx`)** 👩‍🍳
-  - Muestra la cola de pedidos en preparación.
-  - Permite aceptar y empaquetar pedidos.
-  - Interactúa con `kitchen-svc` (por ejemplo `GET /kitchen/queue`, `POST /kitchen/orders/{order_id}/accept`, `POST /kitchen/orders/{order_id}/pack`) y refleja estados de `orders-svc`.
-
-- **`/delivery` – Delivery (`Delivery.jsx`)** 🛵
-  - Pantalla para coordinar repartidores y entregas.
-  - Puede mostrar asignaciones, tracking de repartidores, estados de cada entrega.
-  - Habla con `delivery-svc` (asignación, estado, tracking, riders) y se apoya en datos de `orders-svc`.
-
-- **`/admin/menu` – Administración de menú (`AdminMenu.jsx`)** 📜
-  - Permite listar, crear, editar y eliminar productos del menú.
-  - Consume endpoints de `kitchen-svc` sobre `MenuItems` (`GET /menu`, `POST /menu`, `PATCH /menu/{id_producto}`, `DELETE /menu/{id_producto}`).
-
-- **`/admin/staff` – Administración de staff (`AdminStaff.jsx`)** 👥
-  - Gestión de personal: alta, baja, cambios de estado.
-  - Usa endpoints de `kitchen-svc` para staff (`POST /staff`, `PATCH /staff/{id_staff}`, `GET /staff`) y se relaciona con la tabla `Staff` en DynamoDB.
-
-- **`/admin/analytics` – Analytics avanzado (`AdminAnalytics.jsx`)** 📈
-  - Muestra métricas agregadas de pedidos, tiempos de preparación, desempeño de repartidores y staff.
-  - Consume endpoints de `analytics-svc` (`/analytics/orders`, `/analytics/employees`, `/analytics/delivery`, `/analytics/dashboard`, `/analytics/workflow-kpis`).
-
-> 🔐 El componente `RequireRole` asegura que solo usuarios con los roles adecuados (`staff`, `delivery`, `admin`) accedan a cada ruta.
-
----
-
-## 4. Cliente de API y utilidades (`src/api/client.js`) 🔌
-
-Funciones clave:
-
-- `api(path, opts)`
-  - Wrapper general de `fetch` con:
-    - Headers de autenticación y tenant.
-    - Soporte de `timeout` y abort controller.
-    - Manejo de 401/403 (limpia sesión y redirige a `/login`).
-    - Parseo robusto de errores (JSON o texto).
-
-- `retryApi(path, options, retries, delay)`
-  - Reintenta automáticamente solicitudes fallidas (salvo errores de autenticación).
-
-- `healthCheck()`
-  - Verifica disponibilidad del backend llamando a `/health`.
-
-- Utilidades de sesión:
-  - `getAuthData`, `setAuthData`, `clearAuthData`.
-
-- Utilidades de presentación:
-  - `formatPrice`, `formatPriceEnhanced`, `haversine`, `formatDuration`.
-
----
-
-## 5. Mejoras de estructura propuestas ✨
-
-Estas mejoras **no están implementadas todavía**, pero son recomendaciones claras para evolucionar este frontend de staff:
-
-1. **Separar vistas por dominio de negocio** 🧩
-   - Crear subcarpetas bajo `src/pages` como:
-     - `pages/kitchen/*` – componentes específicos de la cola de cocina.
-     - `pages/delivery/*` – vistas y componentes de rutas / tracking.
-     - `pages/admin/*` – menú, staff y analytics.
-   - Facilita mantener y escalar cada área sin mezclar responsabilidades.
-
-2. **Extraer hooks personalizados para datos** 🔄
-   - Crear hooks como `useKitchenQueue`, `useDeliveries`, `useAdminMenu`, `useAnalyticsDashboard` dentro de `src/hooks/`.
-   - Encapsular ahí las llamadas a `api`/`retryApi` y el manejo de loading/error.
-   - Beneficio: las páginas se vuelven más declarativas, centradas en UI.
-
-3. **Normalizar manejo de errores y toasts** 🔔
-   - Definir una pequeña capa de helpers (`handleApiError`, `useApiToast`) que:
-     - Reciba un error y muestre mensajes consistentes con el `ToastProvider`.
-     - Evite repetir try/catch y lógica de mensajes en cada página.
-
-4. **Componentizar layouts y tarjetas reutilizables** 🧱
-   - Extraer componentes tipo `Card`, `Section`, `StatusBadge`, `Table` reutilizables.
-   - Reducir duplicación de estilos inline y centralizar tipografía / colores en `styles.css`.
-
-5. **Mejorar soporte offline y estados vacíos** 📶
-   - Añadir estados claros para:
-     - "Sin pedidos en cola" en cocina.
-     - "No hay entregas activas" en delivery.
-     - Mensajes amigables cuando `healthCheck` detecte que el backend está caído.
-
-6. **Testing ligero de componentes críticos** ✅
-   - Introducir pruebas básicas (ej. con Vitest/React Testing Library) al menos para:
-     - `Login` (flujo de login correcto / error).
-     - `Kitchen` (render de pedidos, acciones principales).
-     - `Delivery` (render de lista de entregas y estados).
-
-7. **Uso opcional de Leaflet para mapa de operaciones** 🗺️
-   - Reutilizar `leaflet` para un **mapa operativo** en `Delivery` o `Dashboard`:
-     - Ver repartidores en tiempo real.
-     - Ver zonas de reparto o calor de pedidos.
-   - Esto puede alinear visualmente con el mapa ya usado en el frontend de clientes.
-
----
-
-## 6. Cómo ejecutar el frontend staff 🚀
-
-Desde `frontend/staff`:
+## 🚀 Instalación
 
 ```bash
+# Instalar dependencias
 npm install
+
+# Desarrollo
 npm run dev
+
+# Build producción
+npm run build
+
+# Preview build
+npm run preview
 ```
 
-Luego abrir en el navegador la URL que indique Vite (por defecto `http://localhost:5174/`).
+## 🔐 Autenticación
 
-> ✅ Asegúrate de tener el backend desplegado y accesible en la URL configurada en `API_BASE` para que las llamadas funcionen correctamente.
+El sistema usa JWT con multi-tenancy. Cada usuario pertenece a una sede específica:
+
+- `tenant_pq_barranco` - Barranco (UTEC)
+- `tenant_pq_puruchuco` - Puruchuco
+- `tenant_pq_vmt` - Villa María del Triunfo
+- `tenant_pq_jiron` - Jirón de la Unión
+
+## 📱 Roles y Permisos
+
+### Admin
+- Acceso completo a todos los módulos
+- Gestión de menú y personal
+- Analytics y reportes
+
+### Staff (Cocina)
+- Dashboard
+- Kitchen (gestión de pedidos)
+- Visualización de entregas
+
+### Delivery
+- Dashboard
+- Delivery (gestión de entregas)
+- GPS tracking y rutas
+
+## 🎯 Características Destacadas
+
+### Sistema de Notificaciones (Toast)
+Feedback visual para todas las acciones del usuario con estados de éxito, error, advertencia e información.
+
+### Tracking GPS en Tiempo Real
+- Ubicación automática del dispositivo
+- Tracking continuo durante entregas
+- Simulación de rutas para testing
+- Visualización en mapa interactivo
+
+### Multi-sede (Tenancy)
+Cada sede opera de forma independiente con sus propios:
+- Pedidos y entregas
+- Personal
+- Menú (compartido pero con disponibilidad por sede)
+- Analytics
+
+### Diseño Responsive
+Optimizado para:
+- Desktop (1920x1080+)
+- Tablet (1024x768)
+- Mobile (375x667+)
+
+## 🏗️ Estructura del Proyecto
+
+```
+src/
+├── api/
+│   └── client.js          # Cliente API + helpers
+├── components/
+│   ├── AppLayout.jsx      # Layout principal
+│   ├── Sidebar.jsx        # Navegación lateral
+│   ├── TopBar.jsx         # Barra superior
+│   └── StaffHeader.jsx    # Header alternativo
+├── context/
+│   ├── AuthContext.jsx    # Autenticación
+│   └── ToastContext.jsx   # Notificaciones
+├── hooks/
+│   ├── useDeliveryData.js # Hook para delivery
+│   └── useKitchenQueue.js # Hook para cocina
+├── pages/
+│   ├── Login.jsx          # Autenticación
+│   ├── Dashboard.jsx      # Panel principal
+│   ├── Kitchen.jsx        # Módulo cocina
+│   ├── Delivery.jsx       # Módulo delivery
+│   ├── AdminAnalytics.jsx # Analytics
+│   ├── AdminMenu.jsx      # Gestión menú
+│   └── AdminStaff.jsx     # Gestión personal
+├── App.jsx                # Router principal
+├── main.jsx               # Entry point
+└── styles.css             # Sistema de diseño
+```
+
+## 🎨 Sistema de Diseño
+
+### Variables CSS
+Todas las variables están centralizadas en `styles.css`:
+- Colores de marca
+- Espaciado consistente
+- Sombras profesionales
+- Tipografía escalable
+- Bordes y radios
+
+### Componentes Reutilizables
+- `.btn` con variantes: primary, success, warning, danger, ghost
+- `.card` con hover effects
+- `.badge` con estados operacionales
+- `.input` con focus states
+- `.grid` con layouts responsivos
+
+## 📝 Convenciones de Código
+
+- Componentes en PascalCase
+- Hooks con prefijo `use`
+- Contextos con sufijo `Context`
+- Estilos inline solo para valores dinámicos
+- CSS classes para estilos estáticos
+
+## 🔄 Flujo de Trabajo
+
+### Pedido Completo
+1. **Cliente** → Crea pedido (app móvil/web)
+2. **Kitchen** → Acepta y prepara pedido
+3. **Kitchen** → Marca como listo
+4. **Delivery** → Sistema crea entrega automática
+5. **Delivery** → Staff asigna repartidor
+6. **Delivery** → Repartidor recoge y entrega
+7. **Sistema** → Genera recibo y cierra pedido
+
+### Estados de Pedido
+- `pendiente` → Esperando aceptación
+- `aceptado` → En cola de cocina
+- `en_preparacion` → Cocinándose
+- `listo` → Esperando entrega
+- `en_camino` → Repartidor en ruta
+- `entregado` → Completado
+
+## 🌐 API Endpoints
+
+```
+POST   /auth/login              # Login
+GET    /orders                  # Lista pedidos
+PATCH  /orders/:id/accept       # Aceptar pedido
+PATCH  /orders/:id/start        # Iniciar preparación
+PATCH  /orders/:id/ready        # Marcar listo
+POST   /delivery/assign         # Asignar delivery
+POST   /delivery/location       # Actualizar GPS
+GET    /delivery/:id/track      # Track delivery
+GET    /analytics/*             # Métricas
+GET    /menu                    # Productos
+GET    /staff                   # Personal
+```
+
+## 🐛 Debugging
+
+### Logs del Sistema
+El sistema incluye logs detallados en consola para:
+- Llamadas API
+- Cambios de estado
+- Errores de red
+- Actualizaciones GPS
+
+### Variables de Entorno
+```env
+VITE_API_URL=https://api.papasqueens.com
+VITE_TENANT_ID=tenant_pq_barranco
+```
+
+## 📄 Licencia
+
+Propietario - Papas Queen's © 2024
+
+---
+
+**Desarrollado con 🍟 para Papas Queen's**

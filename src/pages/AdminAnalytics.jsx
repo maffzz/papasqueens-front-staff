@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api, formatPrice } from '../api/client'
 import { useToast } from '../context/ToastContext'
+import AppLayout from '../components/AppLayout'
 
 export default function AdminAnalytics() {
   const [orders, setOrders] = useState(null)
@@ -34,15 +35,7 @@ export default function AdminAnalytics() {
   const totalEmployees = Array.isArray(employees) ? employees.length : 0
 
   return (
-    <main className="container section" style={{ background: '#f8fafc', minHeight: 'calc(100vh - 64px)', padding: '2rem 1rem' }}>
-      <header style={{ marginBottom: '2rem', textAlign: 'center' }}>
-        <h1 className="appTitle" style={{ color:'#03592e', fontSize: '32px', marginBottom: '0.5rem' }}>
-          📊 Analytics Dashboard
-        </h1>
-        <p style={{ color: '#64748b', fontSize: '14px' }}>
-          Métricas y rendimiento del sistema en tiempo real
-        </p>
-      </header>
+    <AppLayout title="📊 Analytics">
 
       {/* Resumen principal con iconos y gradientes */}
       <section className="grid" style={{ gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'1.5rem', marginBottom:'2rem' }}>
@@ -248,6 +241,6 @@ export default function AdminAnalytics() {
           </div>
         )}
       </section>
-    </main>
+    </AppLayout>
   )
 }
